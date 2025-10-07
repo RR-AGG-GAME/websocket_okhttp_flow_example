@@ -1,20 +1,36 @@
 # WebSocket OkHttp Flow Example (Android)
 
-This sample Android Studio project demonstrates using OkHttp WebSocket with Kotlin Coroutines and Flow,
-and handles text + binary messages (images, audio, video) via a simple meta+binary framing.
+A robust Android WebSocket client built with OkHttp, Kotlin Coroutines, and Flow for real-time text messaging.
 
-Features:
-- Connect to a WebSocket server using OkHttp
-- Receive text and binary frames as a Kotlin Flow
-- Send text or pick files (image/audio/video) to send as binary frames (with metadata JSON preceding)
-- Minimal UI to send and view logs
+## 🚀 Features
 
-Notes:
-- This demo uses a simple convention: send a JSON meta text message with type="binary_meta" before sending raw binary.
-- For real production use, implement chunking, checksums, authentication, and robust framing.
-- Replace the example server URL in `MainActivity.kt` with your WebSocket server that understands the framing.
+- **Real-time WebSocket Communication** - Connect to WebSocket servers using OkHttp
+- **Kotlin Flow Integration** - Receive messages as reactive streams
+- **Text-only Messaging** - Send and receive text messages
+- **Robust Error Handling** - Comprehensive error handling and logging
+- **Connection Management** - Automatic reconnection and timeout handling
+- **Clean UI** - Simple interface for testing WebSocket functionality
 
-To run:
-- Open this folder in Android Studio
-- Sync Gradle and run on a device/emulator with internet permission
+## 🏗️ Architecture
+
+- **WebSocketManager** - Manages WebSocket connections and message sending
+- **WebSocketExtensions** - Flow-based WebSocket listener with error handling
+- **WebSocketMessage** - Sealed class for type-safe message handling
+- **MainActivity** - UI and lifecycle management
+
+## 📱 Usage
+
+1. **Connect to WebSocket Server**
+   - Configure your WebSocket server URL in MainActivity.kt
+   - Automatically connects on app launch
+
+2. **Send Messages**
+   - Type text in the input field
+   - Tap "Send Text" button
+   - Messages are sent via WebSocket
+
+3. **Receive Messages**
+   - Incoming messages appear in the log area
+   - Connection status is displayed
+   - Error messages are logged for debugging
 
