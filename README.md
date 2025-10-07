@@ -11,13 +11,6 @@ A robust Android WebSocket client built with OkHttp, Kotlin Coroutines, and Flow
 - **Connection Management** - Automatic reconnection and timeout handling
 - **Clean UI** - Simple interface for testing WebSocket functionality
 
-## 🏗️ Architecture
-
-- **WebSocketManager** - Manages WebSocket connections and message sending
-- **WebSocketExtensions** - Flow-based WebSocket listener with error handling
-- **WebSocketMessage** - Sealed class for type-safe message handling
-- **MainActivity** - UI and lifecycle management
-
 ## 📱 Usage
 
 1. **Connect to WebSocket Server**
@@ -33,4 +26,35 @@ A robust Android WebSocket client built with OkHttp, Kotlin Coroutines, and Flow
    - Incoming messages appear in the log area
    - Connection status is displayed
    - Error messages are logged for debugging
+
+## 🔧 How It Works
+
+This project uses a **custom extension function** approach to convert OkHttp WebSocket into a Kotlin Flow:
+
+```kotlin
+// Extension function on OkHttpClient
+fun OkHttpClient.webSocketFlow(request: Request): Flow<WebSocketMessage> = callbackFlow {
+    val listener = object : WebSocketListener() {
+        override fun onMessage(webSocket: WebSocket, text: String) {
+            trySend(WebSocketMessage.Text(text))
+        }
+        // ... other callbacks
+    }
+    val ws = newWebSocket(request, listener)
+    awaitClose { ws.close(1000, "Closed by client") }
+}
+```
+
+**How it works:**
+1. **Extension Function** - Adds `webSocketFlow()` method to `OkHttpClient`
+2. **CallbackFlow** - Converts WebSocket callbacks into Flow emissions
+3. **trySend()** - Sends messages to the Flow stream
+4. **awaitClose()** - Handles cleanup when Flow is cancelled
+5. **Flow Collection** - MainActivity collects messages reactively
+
+**Benefits:**
+- **Reactive** - Messages arrive as Flow emissions
+- **Lifecycle-aware** - Automatically handles connection cleanup
+- **Type-safe** - Sealed class for different message types
+- **Error handling** - Built-in exception handling
 
