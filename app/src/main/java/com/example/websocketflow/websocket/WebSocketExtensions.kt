@@ -1,4 +1,4 @@
-package com.example.websocketflow
+package com.example.websocketflow.websocket
 
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
