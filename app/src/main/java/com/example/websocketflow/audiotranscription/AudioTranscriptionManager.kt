@@ -3,6 +3,8 @@ package com.example.websocketflow.audiotranscription
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -22,6 +24,50 @@ class AudioTranscriptionManager(private val context: Context) {
     private val _errorMessage = MutableStateFlow("")
     val errorMessage: StateFlow<String> = _errorMessage.asStateFlow()
     
+    private val _audioLevel = MutableStateFlow(0f)
+    val audioLevel: StateFlow<Float> = _audioLevel.asStateFlow()
+    
+    private val _isContinuousMode = MutableStateFlow(false)
+    val isContinuousMode: StateFlow<Boolean> = _isContinuousMode.asStateFlow()
+    
+    private val _remainingTime = MutableStateFlow(0)
+    val remainingTime: StateFlow<Int> = _remainingTime.asStateFlow()
+    
+    private var timerHandler: Handler? = null
+    private var timerRunnable: Runnable? = null
+    private val maxRecordingTime = 180 // 3 minutes in seconds
+    
+    fun toggleContinuousMode() {
+        _isContinuousMode.value = !_isContinuousMode.value
+    }
+    
+    private fun startTimer() {
+        if (_isContinuousMode.value) {
+            _remainingTime.value = maxRecordingTime
+            timerHandler = Handler(Looper.getMainLooper())
+            timerRunnable = object : Runnable {
+                override fun run() {
+                    if (_remainingTime.value > 0 && _isRecording.value) {
+                        _remainingTime.value = _remainingTime.value - 1
+                        timerHandler?.postDelayed(this, 1000)
+                    } else if (_remainingTime.value <= 0 && _isRecording.value) {
+                        // Auto-stop after 3 minutes
+                        stopRecording()
+                        _errorMessage.value = "Recording stopped after 3 minutes"
+                    }
+                }
+            }
+            timerHandler?.post(timerRunnable!!)
+        }
+    }
+    
+    private fun stopTimer() {
+        timerHandler?.removeCallbacks(timerRunnable!!)
+        timerRunnable = null
+        timerHandler = null
+        _remainingTime.value = 0
+    }
+    
     fun startRecording() {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             _errorMessage.value = "Speech recognition not available on this device"
@@ -33,6 +79,7 @@ class AudioTranscriptionManager(private val context: Context) {
             override fun onReadyForSpeech(params: Bundle?) {
                 _isRecording.value = true
                 _errorMessage.value = ""
+                startTimer()
             }
             
             override fun onBeginningOfSpeech() {
@@ -40,7 +87,9 @@ class AudioTranscriptionManager(private val context: Context) {
             }
             
             override fun onRmsChanged(rmsdB: Float) {
-                // Audio level changed
+                // Convert dB to 0-1 range for visualization
+                val normalizedLevel = (rmsdB + 20) / 20f // Assuming -20dB to 0dB range
+                _audioLevel.value = normalizedLevel.coerceIn(0f, 1f)
             }
             
             override fun onBufferReceived(buffer: ByteArray?) {
@@ -48,11 +97,17 @@ class AudioTranscriptionManager(private val context: Context) {
             }
             
             override fun onEndOfSpeech() {
-                _isRecording.value = false
+                if (!_isContinuousMode.value) {
+                    _isRecording.value = false
+                    _audioLevel.value = 0f
+                    stopTimer()
+                }
+                // In continuous mode, keep recording even after speech ends
             }
             
             override fun onError(error: Int) {
                 _isRecording.value = false
+                stopTimer()
                 val errorMsg = when (error) {
                     SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
                     SpeechRecognizer.ERROR_CLIENT -> "Client side error"
@@ -100,6 +155,8 @@ class AudioTranscriptionManager(private val context: Context) {
     fun stopRecording() {
         speechRecognizer?.stopListening()
         _isRecording.value = false
+        _audioLevel.value = 0f
+        stopTimer()
     }
     
     fun clearTranscription() {
@@ -108,6 +165,7 @@ class AudioTranscriptionManager(private val context: Context) {
     }
     
     fun destroy() {
+        stopTimer()
         speechRecognizer?.destroy()
         speechRecognizer = null
     }

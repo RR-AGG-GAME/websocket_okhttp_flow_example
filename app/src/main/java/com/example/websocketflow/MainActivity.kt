@@ -35,7 +35,12 @@ import com.example.websocketflow.ui.theme.WebSocketFlowExampleTheme
 import com.example.websocketflow.websocket.WebSocketManager
 import com.example.websocketflow.websocket.WebSocketMessage
 import com.example.websocketflow.audiotranscription.AudioTranscriptionManager
+import com.example.websocketflow.audiotranscription.AudioVisualization
+import com.example.websocketflow.audiotranscription.AudioLevelIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.Switch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,55 +88,114 @@ fun HomeScreen(navController: NavHostController) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = "WebSocket Flow Example",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 32.dp)
-        )
+        // App header with icon
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = 48.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Apps,
+                contentDescription = "App Icon",
+                modifier = Modifier.size(40.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = "WebSocket Flow Example",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
         
+        // WebSocket option
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
-            onClick = { navController.navigate("websocket") }
+            onClick = { navController.navigate("websocket") },
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
+            Row(
+                modifier = Modifier.padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "1. WebSocket Example",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium
+                Icon(
+                    imageVector = Icons.Default.Wifi,
+                    contentDescription = "WebSocket",
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
-                Text(
-                    text = "Real-time text messaging with OkHttp and Kotlin Flow",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "WebSocket Example",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = "Real-time text messaging with OkHttp and Kotlin Flow",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.ArrowForward,
+                    contentDescription = "Navigate",
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
                 )
             }
         }
         
+        // Audio Transcription option
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
-            onClick = { navController.navigate("audio_transcription") }
+            onClick = { navController.navigate("audio_transcription") },
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer
+            )
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
+            Row(
+                modifier = Modifier.padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "2. Audio Transcription",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = "Audio Transcription",
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer
                 )
-                Text(
-                    text = "Record and transcribe audio using speech recognition",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "Audio Transcription",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Text(
+                        text = "Record and transcribe audio with live visualization",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.ArrowForward,
+                    contentDescription = "Navigate",
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f)
                 )
             }
         }
@@ -245,6 +309,9 @@ fun AudioTranscriptionScreen() {
     val isRecording by audioManager.isRecording.collectAsState()
     val transcriptionResult by audioManager.transcriptionResult.collectAsState()
     val errorMessage by audioManager.errorMessage.collectAsState()
+    val audioLevel by audioManager.audioLevel.collectAsState()
+    val isContinuousMode by audioManager.isContinuousMode.collectAsState()
+    val remainingTime by audioManager.remainingTime.collectAsState()
     
     // Permission launcher
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -284,28 +351,90 @@ fun AudioTranscriptionScreen() {
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Text(
-            text = "Audio Transcription",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+        // Header with icon
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Mic,
+                contentDescription = "Audio Transcription",
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "Audio Transcription",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
         
-        // Recording status
-        if (isRecording) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
-                )
+        // Audio Visualization
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "🎤 Recording... Speak now",
-                    modifier = Modifier.padding(16.dp),
-                    color = MaterialTheme.colorScheme.onErrorContainer
+                AudioVisualization(
+                    audioLevel = audioLevel,
+                    isRecording = isRecording,
+                    modifier = Modifier.fillMaxWidth()
                 )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Recording status with icon
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    if (isRecording) {
+                        Icon(
+                            imageVector = Icons.Default.RadioButtonChecked,
+                            contentDescription = "Recording",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Recording... Speak now",
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Medium
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.RadioButtonUnchecked,
+                            contentDescription = "Not Recording",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Ready to record",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                // Audio level indicator
+                if (isRecording) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    AudioLevelIndicator(
+                        audioLevel = audioLevel,
+                        isRecording = isRecording
+                    )
+                }
             }
         }
         
@@ -319,63 +448,213 @@ fun AudioTranscriptionScreen() {
                     containerColor = MaterialTheme.colorScheme.errorContainer
                 )
             ) {
-                Text(
-                    text = "Error: $errorMessage",
+                Row(
                     modifier = Modifier.padding(16.dp),
-                    color = MaterialTheme.colorScheme.onErrorContainer
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Error,
+                        contentDescription = "Error",
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
+        
+        // Continuous Mode Toggle
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Timer,
+                    contentDescription = "Timer",
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "Continuous Recording Mode",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Text(
+                        text = if (isContinuousMode) "Records for up to 3 minutes" else "Stops when speech ends",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                    )
+                }
+                Switch(
+                    checked = isContinuousMode,
+                    onCheckedChange = { audioManager.toggleContinuousMode() },
+                    enabled = !isRecording
                 )
             }
         }
         
-        // Control buttons
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = { startRecordingWithPermission() },
-                enabled = !isRecording,
-                modifier = Modifier.weight(1f)
+        // Timer Display (only show when in continuous mode and recording)
+        if (isContinuousMode && isRecording && remainingTime > 0) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                )
             ) {
-                Text("Start Recording")
-            }
-            
-            Button(
-                onClick = { audioManager.stopRecording() },
-                enabled = isRecording,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Stop Recording")
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AccessTime,
+                        contentDescription = "Time Remaining",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Time Remaining: ${formatTime(remainingTime)}",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
             }
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Button(
-            onClick = { audioManager.clearTranscription() },
-            modifier = Modifier.fillMaxWidth()
+        // Control buttons with enhanced design
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
         ) {
-            Text("Clear Transcription")
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = { startRecordingWithPermission() },
+                        enabled = !isRecording,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = "Start Recording",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Start")
+                    }
+                    
+                    Button(
+                        onClick = { audioManager.stopRecording() },
+                        enabled = isRecording,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Stop,
+                            contentDescription = "Stop Recording",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Stop")
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                OutlinedButton(
+                    onClick = { audioManager.clearTranscription() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Clear,
+                        contentDescription = "Clear",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Clear Transcription")
+                }
+            }
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Transcription result
-        Text(
-            text = "Transcription:",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        
+        // Transcription result with enhanced design
         Card(
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(
-                text = if (transcriptionResult.isEmpty()) "No transcription yet. Press 'Start Recording' to begin." else transcriptionResult,
-                modifier = Modifier.padding(16.dp),
-                fontSize = 14.sp
-            )
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.TextFields,
+                        contentDescription = "Transcription",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Transcription Result",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                
+                Text(
+                    text = if (transcriptionResult.isEmpty()) 
+                        "No transcription yet. Press 'Start Recording' to begin." 
+                    else 
+                        transcriptionResult,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = if (transcriptionResult.isEmpty()) 
+                        MaterialTheme.colorScheme.onSurfaceVariant 
+                    else 
+                        MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
     }
+}
+
+private fun formatTime(seconds: Int): String {
+    val minutes = seconds / 60
+    val remainingSeconds = seconds % 60
+    return String.format("%02d:%02d", minutes, remainingSeconds)
 }
