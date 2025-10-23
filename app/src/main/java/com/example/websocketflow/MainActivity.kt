@@ -37,6 +37,7 @@ import com.example.websocketflow.websocket.WebSocketMessage
 import com.example.websocketflow.audiotranscription.AudioTranscriptionManager
 import com.example.websocketflow.audiotranscription.AudioVisualization
 import com.example.websocketflow.audiotranscription.AudioLevelIndicator
+import com.example.websocketflow.invoice.InvoiceCreationScreen
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -74,6 +75,9 @@ fun MainNavigation() {
         }
         composable("audio_transcription") {
             AudioTranscriptionScreen()
+        }
+        composable("invoice_creation") {
+            InvoiceCreationScreen()
         }
     }
 }
@@ -196,6 +200,52 @@ fun HomeScreen(navController: NavHostController) {
                     contentDescription = "Navigate",
                     modifier = Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f)
+                )
+            }
+        }
+        
+        // Invoice Creation option
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            onClick = { navController.navigate("invoice_creation") },
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Receipt,
+                    contentDescription = "Invoice Creation",
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "Invoice Creation",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    Text(
+                        text = "Create invoices with voice input and smart suggestions",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.ArrowForward,
+                    contentDescription = "Navigate",
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.6f)
                 )
             }
         }
