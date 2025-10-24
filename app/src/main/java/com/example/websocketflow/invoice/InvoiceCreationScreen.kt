@@ -28,7 +28,33 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.Manifest
+import android.widget.Toast
 import com.example.websocketflow.audiotranscription.AudioTranscriptionManager
+
+// Utility method to handle permission result
+fun handleAudioPermissionResult(
+    isGranted: Boolean, 
+    audioManager: AudioTranscriptionManager,
+    context: android.content.Context,
+    onRecordingStateChange: (Boolean) -> Unit
+) {
+    if (isGranted) {
+        // Permission granted, start recording
+        audioManager.startRecording()
+        onRecordingStateChange(true)
+    } else {
+        // Permission denied, show toast message
+        Toast.makeText(
+            context, 
+            "Audio recording permission is required for voice input", 
+            Toast.LENGTH_LONG
+        ).show()
+        onRecordingStateChange(false)
+    }
+}
 
 @Composable
 fun ChatInputField(
@@ -138,6 +164,15 @@ fun InvoiceCreationScreen() {
     
     // Use the audio manager's recording state
     val isActuallyRecording = isRecordingAudio
+    
+    // Permission launcher for audio recording
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        handleAudioPermissionResult(isGranted, audioManager, context) { recording ->
+            isRecording = recording
+        }
+    }
     
     // Live transcription - update text field in real-time
     LaunchedEffect(transcriptionResult) {
@@ -262,9 +297,8 @@ fun InvoiceCreationScreen() {
                         }
                     },
                     onVoiceStart = {
-                        isRecording = true
-                        isTyping = false
-                        audioManager.startRecording()
+                        // Request audio recording permission first
+                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     },
                     onVoiceStop = {
                         isRecording = false
