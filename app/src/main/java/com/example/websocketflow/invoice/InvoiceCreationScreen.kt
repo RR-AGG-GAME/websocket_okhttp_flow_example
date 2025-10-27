@@ -176,7 +176,7 @@ fun InvoiceCreationScreen() {
     
     // Live transcription - update text field in real-time
     LaunchedEffect(transcriptionResult) {
-        if (transcriptionResult.isNotEmpty()) {
+        if (transcriptionResult.isNotEmpty() && isActuallyRecording) {
             println("Live transcription: '$transcriptionResult'")
             inputText = transcriptionResult
             isTyping = true
@@ -281,11 +281,9 @@ fun InvoiceCreationScreen() {
                 ChatInputField(
                     inputText = if (isRecording && transcriptionResult.isEmpty()) "Recording..." else inputText,
                     onTextChange = { newText ->
-                        // Don't allow manual typing while recording
-                        if (!isRecording) {
-                            inputText = newText
-                            isTyping = newText.isNotEmpty()
-                        }
+                        // Allow manual typing at any time
+                        inputText = newText
+                        isTyping = newText.isNotEmpty()
                     },
                     isRecording = isActuallyRecording,
                     isTyping = isTyping || inputText.isNotEmpty(),
@@ -294,6 +292,9 @@ fun InvoiceCreationScreen() {
                             messages = messages + inputText
                             inputText = ""
                             isTyping = false
+                            // Clear any transcription result and reset states
+                            audioManager.clearTranscription()
+                            isRecording = false
                         }
                     },
                     onVoiceStart = {
