@@ -61,4 +61,8 @@ dependencies {
     
     // Lifecycle Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    
+    // Koin for Dependency Injection
+    implementation("io.insert-koin:koin-android:3.5.0")
+    implementation("io.insert-koin:koin-androidx-compose:3.5.0")
 }

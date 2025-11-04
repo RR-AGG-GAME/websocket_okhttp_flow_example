@@ -1,6 +1,5 @@
 package com.example.websocketflow.invoice
 
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,44 +16,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.Manifest
 import android.widget.Toast
-import com.example.websocketflow.audiotranscription.AudioTranscriptionManager
-
-// Utility method to handle permission result
-fun handleAudioPermissionResult(
-    isGranted: Boolean, 
-    audioManager: AudioTranscriptionManager,
-    context: android.content.Context,
-    onRecordingStateChange: (Boolean) -> Unit
-) {
-    if (isGranted) {
-        // Permission granted, start recording
-        audioManager.startRecording()
-        onRecordingStateChange(true)
-    } else {
-        // Permission denied, show toast message
-        Toast.makeText(
-            context, 
-            "Audio recording permission is required for voice input", 
-            Toast.LENGTH_LONG
-        ).show()
-        onRecordingStateChange(false)
-    }
-}
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.websocketflow.audiotranscription.AudioTranscriptionViewModel
 
 @Composable
 fun ChatInputField(
@@ -96,8 +70,11 @@ fun ChatInputField(
                 unfocusedLabelColor = Color(0xFF757575)
             ),
             maxLines = 5,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = KeyboardActions(onSend = { onSend() })
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+            keyboardActions = KeyboardActions(onNext = { 
+                // Add line break to the text
+                onTextChange(inputText + "\n")
+            })
         )
         
         Spacer(modifier = Modifier.width(8.dp))
@@ -150,50 +127,41 @@ fun ChatInputField(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InvoiceCreationScreen() {
+fun InvoiceCreationScreen(
+    viewModel: AudioTranscriptionViewModel = viewModel()
+) {
     val context = LocalContext.current
-    var inputText by remember { mutableStateOf("") }
-    var isRecording by remember { mutableStateOf(false) }
-    var isTyping by remember { mutableStateOf(false) }
+    val uiState by viewModel.uiState.collectAsState()
+    
     var messages by remember { mutableStateOf(listOf<String>()) }
-    
-    // Audio transcription manager
-    val audioManager = remember { AudioTranscriptionManager(context) }
-    val transcriptionResult by audioManager.transcriptionResult.collectAsState()
-    val isRecordingAudio by audioManager.isRecording.collectAsState()
-    
-    // Use the audio manager's recording state
-    val isActuallyRecording = isRecordingAudio
     
     // Permission launcher for audio recording
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        handleAudioPermissionResult(isGranted, audioManager, context) { recording ->
-            isRecording = recording
-        }
-    }
-    
-    // Live transcription - update text field in real-time
-    LaunchedEffect(transcriptionResult) {
-        if (transcriptionResult.isNotEmpty() && isActuallyRecording) {
-            println("Live transcription: '$transcriptionResult'")
-            inputText = transcriptionResult
-            isTyping = true
+        if (isGranted) {
+            viewModel.startRecording(context)
+        } else {
+            Toast.makeText(
+                context,
+                "Audio recording permission is required for voice input",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
     
     // Clear transcription when starting new recording
-    LaunchedEffect(isActuallyRecording) {
-        if (isActuallyRecording) {
-            audioManager.clearTranscription()
+    LaunchedEffect(uiState.isRecording) {
+        if (uiState.isRecording) {
+            viewModel.clearTranscription()
         }
     }
     
-    // Cleanup on dispose
-    DisposableEffect(Unit) {
-        onDispose {
-            audioManager.destroy()
+    // Show error message if any
+    LaunchedEffect(uiState.errorMessage) {
+        if (uiState.errorMessage.isNotEmpty()) {
+            Toast.makeText(context, uiState.errorMessage, Toast.LENGTH_LONG).show()
+            viewModel.clearError()
         }
     }
     
@@ -279,22 +247,20 @@ fun InvoiceCreationScreen() {
                     .padding(12.dp)
             ) {
                 ChatInputField(
-                    inputText = if (isRecording && transcriptionResult.isEmpty()) "Recording..." else inputText,
-                    onTextChange = { newText ->
-                        // Allow manual typing at any time
-                        inputText = newText
-                        isTyping = newText.isNotEmpty()
+                    inputText = if (uiState.isRecording && uiState.transcriptionResult.isEmpty()) {
+                        "Recording..."
+                    } else {
+                        uiState.inputText
                     },
-                    isRecording = isActuallyRecording,
-                    isTyping = isTyping || inputText.isNotEmpty(),
+                    onTextChange = { newText ->
+                        viewModel.updateInputText(newText)
+                    },
+                    isRecording = uiState.isRecording,
+                    isTyping = uiState.isTyping || uiState.inputText.isNotEmpty(),
                     onSend = {
-                        if (inputText.isNotEmpty()) {
-                            messages = messages + inputText
-                            inputText = ""
-                            isTyping = false
-                            // Clear any transcription result and reset states
-                            audioManager.clearTranscription()
-                            isRecording = false
+                        if (uiState.inputText.isNotEmpty()) {
+                            messages = messages + uiState.inputText
+                            viewModel.sendMessage()
                         }
                     },
                     onVoiceStart = {
@@ -302,13 +268,10 @@ fun InvoiceCreationScreen() {
                         permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     },
                     onVoiceStop = {
-                        isRecording = false
-                        isTyping = false
-                        audioManager.stopRecording()
+                        viewModel.stopRecording()
                     }
                 )
             }
         }
     }
 }
-

@@ -34,9 +34,8 @@ import okhttp3.Request
 import com.example.websocketflow.ui.theme.WebSocketFlowExampleTheme
 import com.example.websocketflow.websocket.WebSocketManager
 import com.example.websocketflow.websocket.WebSocketMessage
-import com.example.websocketflow.audiotranscription.AudioTranscriptionManager
-import com.example.websocketflow.audiotranscription.AudioVisualization
-import com.example.websocketflow.audiotranscription.AudioLevelIndicator
+import com.example.websocketflow.audiotranscription.AudioTranscriptionViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.websocketflow.invoice.InvoiceCreationScreen
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material.icons.Icons
@@ -352,23 +351,18 @@ fun WebSocketScreen() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AudioTranscriptionScreen() {
+fun AudioTranscriptionScreen(
+    viewModel: AudioTranscriptionViewModel = viewModel()
+) {
     val context = LocalContext.current
-    val audioManager = remember { AudioTranscriptionManager(context) }
-    
-    val isRecording by audioManager.isRecording.collectAsState()
-    val transcriptionResult by audioManager.transcriptionResult.collectAsState()
-    val errorMessage by audioManager.errorMessage.collectAsState()
-    val audioLevel by audioManager.audioLevel.collectAsState()
-    val isContinuousMode by audioManager.isContinuousMode.collectAsState()
-    val remainingTime by audioManager.remainingTime.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
     
     // Permission launcher
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            audioManager.startRecording()
+            viewModel.startRecording(context)
         } else {
             // Handle permission denied
         }
@@ -381,18 +375,11 @@ fun AudioTranscriptionScreen() {
                 context,
                 Manifest.permission.RECORD_AUDIO
             ) == PackageManager.PERMISSION_GRANTED -> {
-                audioManager.startRecording()
+                viewModel.startRecording(context)
             }
             else -> {
                 permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
-        }
-    }
-    
-    // Cleanup on dispose
-    DisposableEffect(Unit) {
-        onDispose {
-            audioManager.destroy()
         }
     }
     
@@ -423,7 +410,7 @@ fun AudioTranscriptionScreen() {
             )
         }
         
-        // Audio Visualization
+        // Recording status
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -436,20 +423,12 @@ fun AudioTranscriptionScreen() {
                 modifier = Modifier.padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                AudioVisualization(
-                    audioLevel = audioLevel,
-                    isRecording = isRecording,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
                 // Recording status with icon
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    if (isRecording) {
+                    if (uiState.isRecording) {
                         Icon(
                             imageVector = Icons.Default.RadioButtonChecked,
                             contentDescription = "Recording",
@@ -476,20 +455,11 @@ fun AudioTranscriptionScreen() {
                         )
                     }
                 }
-                
-                // Audio level indicator
-                if (isRecording) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    AudioLevelIndicator(
-                        audioLevel = audioLevel,
-                        isRecording = isRecording
-                    )
-                }
             }
         }
         
         // Error message
-        if (errorMessage.isNotEmpty()) {
+        if (uiState.errorMessage.isNotEmpty()) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -510,87 +480,13 @@ fun AudioTranscriptionScreen() {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = errorMessage,
+                        text = uiState.errorMessage,
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
                 }
             }
         }
         
-        // Continuous Mode Toggle
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
-            )
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Timer,
-                    contentDescription = "Timer",
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = "Continuous Recording Mode",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    Text(
-                        text = if (isContinuousMode) "Records for up to 3 minutes" else "Stops when speech ends",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
-                    )
-                }
-                Switch(
-                    checked = isContinuousMode,
-                    onCheckedChange = { audioManager.toggleContinuousMode() },
-                    enabled = !isRecording
-                )
-            }
-        }
-        
-        // Timer Display (only show when in continuous mode and recording)
-        if (isContinuousMode && isRecording && remainingTime > 0) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AccessTime,
-                        contentDescription = "Time Remaining",
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Time Remaining: ${formatTime(remainingTime)}",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                }
-            }
-        }
         
         // Control buttons with enhanced design
         Card(
@@ -610,7 +506,7 @@ fun AudioTranscriptionScreen() {
                 ) {
                     Button(
                         onClick = { startRecordingWithPermission() },
-                        enabled = !isRecording,
+                        enabled = !uiState.isRecording,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
@@ -626,8 +522,8 @@ fun AudioTranscriptionScreen() {
                     }
                     
                     Button(
-                        onClick = { audioManager.stopRecording() },
-                        enabled = isRecording,
+                        onClick = { viewModel.stopRecording() },
+                        enabled = uiState.isRecording,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error
@@ -646,7 +542,7 @@ fun AudioTranscriptionScreen() {
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 OutlinedButton(
-                    onClick = { audioManager.clearTranscription() },
+                    onClick = { viewModel.clearTranscription() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(
@@ -687,13 +583,13 @@ fun AudioTranscriptionScreen() {
                 }
                 
                 Text(
-                    text = if (transcriptionResult.isEmpty()) 
+                    text = if (uiState.transcriptionResult.isEmpty()) 
                         "No transcription yet. Press 'Start Recording' to begin." 
                     else 
-                        transcriptionResult,
+                        uiState.transcriptionResult,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
-                    color = if (transcriptionResult.isEmpty()) 
+                    color = if (uiState.transcriptionResult.isEmpty()) 
                         MaterialTheme.colorScheme.onSurfaceVariant 
                     else 
                         MaterialTheme.colorScheme.onSurface
