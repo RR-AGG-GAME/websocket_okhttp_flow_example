@@ -1,19 +1,28 @@
 package com.example.websocketflow.audiotranscription
 
-data class AudioTranscriptionState(
-    val isRecording: Boolean = false,
-    val transcriptionResult: String = "",
-    val errorMessage: String = "",
-    val inputText: String = "",
-    val isTyping: Boolean = false
-) {
-    val hasError: Boolean
-        get() = errorMessage.isNotEmpty()
+sealed interface AudioTranscriptionState {
+    val inputText: String
     
-    val hasTranscription: Boolean
-        get() = transcriptionResult.isNotEmpty()
+    data object Idle : AudioTranscriptionState {
+        override val inputText: String = ""
+    }
     
-    val canRecord: Boolean
-        get() = !isRecording && !hasError
+    data class Recording(
+        override val inputText: String = ""
+    ) : AudioTranscriptionState
+    
+    data class Transcribing(
+        val transcriptionResult: String,
+        override val inputText: String
+    ) : AudioTranscriptionState
+    
+    data class Error(
+        val message: String,
+        override val inputText: String = ""
+    ) : AudioTranscriptionState
+    
+    data class Ready(
+        val transcriptionResult: String,
+        override val inputText: String
+    ) : AudioTranscriptionState
 }
-

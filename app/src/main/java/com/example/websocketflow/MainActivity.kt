@@ -35,7 +35,8 @@ import com.example.websocketflow.ui.theme.WebSocketFlowExampleTheme
 import com.example.websocketflow.websocket.WebSocketManager
 import com.example.websocketflow.websocket.WebSocketMessage
 import com.example.websocketflow.audiotranscription.AudioTranscriptionViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.websocketflow.audiotranscription.AudioTranscriptionState
+import org.koin.androidx.compose.koinViewModel
 import com.example.websocketflow.invoice.InvoiceCreationScreen
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material.icons.Icons
@@ -352,10 +353,23 @@ fun WebSocketScreen() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AudioTranscriptionScreen(
-    viewModel: AudioTranscriptionViewModel = viewModel()
+    viewModel: AudioTranscriptionViewModel = koinViewModel()
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    
+    // Helper values from sealed interface
+    val currentState = uiState
+    val isRecording = currentState is AudioTranscriptionState.Recording || currentState is AudioTranscriptionState.Transcribing
+    val transcriptionResult = when (currentState) {
+        is AudioTranscriptionState.Transcribing -> currentState.transcriptionResult
+        is AudioTranscriptionState.Ready -> currentState.transcriptionResult
+        else -> ""
+    }
+    val errorMessage = when (currentState) {
+        is AudioTranscriptionState.Error -> currentState.message
+        else -> ""
+    }
     
     // Permission launcher
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -428,7 +442,7 @@ fun AudioTranscriptionScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    if (uiState.isRecording) {
+                    if (isRecording) {
                         Icon(
                             imageVector = Icons.Default.RadioButtonChecked,
                             contentDescription = "Recording",
@@ -459,7 +473,7 @@ fun AudioTranscriptionScreen(
         }
         
         // Error message
-        if (uiState.errorMessage.isNotEmpty()) {
+        if (errorMessage.isNotEmpty()) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -480,7 +494,7 @@ fun AudioTranscriptionScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = uiState.errorMessage,
+                        text = errorMessage,
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
                 }
@@ -506,7 +520,7 @@ fun AudioTranscriptionScreen(
                 ) {
                     Button(
                         onClick = { startRecordingWithPermission() },
-                        enabled = !uiState.isRecording,
+                        enabled = !isRecording,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
@@ -523,7 +537,7 @@ fun AudioTranscriptionScreen(
                     
                     Button(
                         onClick = { viewModel.stopRecording() },
-                        enabled = uiState.isRecording,
+                        enabled = isRecording,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error
@@ -583,13 +597,13 @@ fun AudioTranscriptionScreen(
                 }
                 
                 Text(
-                    text = if (uiState.transcriptionResult.isEmpty()) 
+                    text = if (transcriptionResult.isEmpty()) 
                         "No transcription yet. Press 'Start Recording' to begin." 
                     else 
-                        uiState.transcriptionResult,
+                        transcriptionResult,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
-                    color = if (uiState.transcriptionResult.isEmpty()) 
+                    color = if (transcriptionResult.isEmpty()) 
                         MaterialTheme.colorScheme.onSurfaceVariant 
                     else 
                         MaterialTheme.colorScheme.onSurface

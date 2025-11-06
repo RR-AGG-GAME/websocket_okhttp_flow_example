@@ -4,8 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -17,18 +15,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
+import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.Manifest
 import android.widget.Toast
-import androidx.lifecycle.viewmodel.compose.viewModel
+import org.koin.androidx.compose.koinViewModel
 import com.example.websocketflow.audiotranscription.AudioTranscriptionViewModel
+import com.example.websocketflow.audiotranscription.AudioTranscriptionState
 
 @Composable
 fun ChatInputField(
@@ -44,7 +42,6 @@ fun ChatInputField(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Text field
         OutlinedTextField(
             value = inputText,
             onValueChange = onTextChange,
@@ -72,14 +69,12 @@ fun ChatInputField(
             maxLines = 5,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
             keyboardActions = KeyboardActions(onNext = { 
-                // Add line break to the text
                 onTextChange(inputText + "\n")
             })
         )
         
         Spacer(modifier = Modifier.width(8.dp))
         
-        // Action button - only show when text field is empty OR when recording/typing
         if (inputText.isEmpty() || isRecording || isTyping) {
             Box(
                 modifier = Modifier
@@ -125,42 +120,56 @@ fun ChatInputField(
     }
 }
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InvoiceCreationScreen(
-    viewModel: AudioTranscriptionViewModel = viewModel()
+    viewModel: AudioTranscriptionViewModel = koinViewModel()
 ) {
     val context = LocalContext.current
+    val activity = context as? Activity
     val uiState by viewModel.uiState.collectAsState()
     
-    var messages by remember { mutableStateOf(listOf<String>()) }
+    var inputText by remember { mutableStateOf("") }
     
-    // Permission launcher for audio recording
+    val currentState = uiState
+    val isRecording = currentState is AudioTranscriptionState.Recording || 
+                     currentState is AudioTranscriptionState.Transcribing
+    val isTyping = currentState.inputText.isNotEmpty()
+    val transcriptionResult = when (currentState) {
+        is AudioTranscriptionState.Transcribing -> currentState.transcriptionResult
+        is AudioTranscriptionState.Ready -> currentState.transcriptionResult
+        else -> ""
+    }
+    val errorMessage = when (currentState) {
+        is AudioTranscriptionState.Error -> currentState.message
+        else -> ""
+    }
+    
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (isGranted) {
-            viewModel.startRecording(context)
+        if (isGranted && activity != null) {
+            viewModel.startRecording(activity)
         } else {
             Toast.makeText(
                 context,
-                "Audio recording permission is required for voice input",
+                "Audio recording permission is required",
                 Toast.LENGTH_LONG
             ).show()
         }
     }
     
-    // Clear transcription when starting new recording
-    LaunchedEffect(uiState.isRecording) {
-        if (uiState.isRecording) {
-            viewModel.clearTranscription()
+    LaunchedEffect(transcriptionResult) {
+        if (transcriptionResult.isNotEmpty() && isRecording) {
+            inputText = transcriptionResult
+            viewModel.updateInputText(transcriptionResult)
         }
     }
     
-    // Show error message if any
-    LaunchedEffect(uiState.errorMessage) {
-        if (uiState.errorMessage.isNotEmpty()) {
-            Toast.makeText(context, uiState.errorMessage, Toast.LENGTH_LONG).show()
+    LaunchedEffect(errorMessage) {
+        if (errorMessage.isNotEmpty()) {
+            Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
             viewModel.clearError()
         }
     }
@@ -168,110 +177,28 @@ fun InvoiceCreationScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
+            .padding(16.dp)
     ) {
-        // Top App Bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Cancel button
-            Text(
-                text = "Cancel",
-                color = Color(0xFF4CAF50),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.clickable { /* Handle cancel */ }
-            )
-            
-            // Title
-            Text(
-                text = "Create new invoice",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-            
-            // Settings gear icon
-            Icon(
-                imageVector = Icons.Default.Settings,
-                contentDescription = "Settings",
-                modifier = Modifier.size(20.dp),
-                tint = Color(0xFF4CAF50)
-            )
-        }
-        
-        // Messages list
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(messages) { message ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Text(
-                        text = message,
-                        modifier = Modifier.padding(16.dp),
-                        fontSize = 16.sp,
-                        color = Color.Black
-                    )
+        ChatInputField(
+            inputText = inputText,
+            onTextChange = { 
+                inputText = it
+                viewModel.updateInputText(it)
+            },
+            isRecording = isRecording,
+            isTyping = isTyping,
+            onSend = {
+                viewModel.sendMessage()
+                inputText = ""
+            },
+            onVoiceStart = {
+                if (activity != null) {
+                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                 }
+            },
+            onVoiceStop = {
+                viewModel.stopRecording()
             }
-        }
-        
-        // Bottom input area
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            // Overall bottom container
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color = Color(0xFFF5F5F5),
-                        shape = RoundedCornerShape(16.dp)
-                    )
-                    .padding(12.dp)
-            ) {
-                ChatInputField(
-                    inputText = if (uiState.isRecording && uiState.transcriptionResult.isEmpty()) {
-                        "Recording..."
-                    } else {
-                        uiState.inputText
-                    },
-                    onTextChange = { newText ->
-                        viewModel.updateInputText(newText)
-                    },
-                    isRecording = uiState.isRecording,
-                    isTyping = uiState.isTyping || uiState.inputText.isNotEmpty(),
-                    onSend = {
-                        if (uiState.inputText.isNotEmpty()) {
-                            messages = messages + uiState.inputText
-                            viewModel.sendMessage()
-                        }
-                    },
-                    onVoiceStart = {
-                        // Request audio recording permission first
-                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    },
-                    onVoiceStop = {
-                        viewModel.stopRecording()
-                    }
-                )
-            }
-        }
+        )
     }
 }
