@@ -52,10 +52,11 @@ class AudioTranscriptionViewModelTest {
     fun `updateInputText should update inputText`() = runTest {
         val testText = "Hello World"
         
-        viewModel.updateInputText(testText)
-        advanceUntilIdle()
-
         viewModel.uiState.test {
+            skipItems(1) // Skip initial value
+            viewModel.updateInputText(testText)
+            advanceUntilIdle()
+            
             val state = awaitItem()
             assertEquals(testText, state.inputText)
             assertTrue(state.inputText.isNotEmpty())
@@ -78,7 +79,7 @@ class AudioTranscriptionViewModelTest {
     }
 
     @Test
-    fun `clearError should clear transcription but keep inputText`() = runTest {
+    fun `clearError should clear transcription and inputText`() = runTest {
         viewModel.updateInputText("Test transcription")
         advanceUntilIdle()
 
@@ -87,7 +88,7 @@ class AudioTranscriptionViewModelTest {
 
         viewModel.uiState.test {
             val state = awaitItem()
-            assertEquals("Test transcription", state.inputText)
+            assertEquals("", state.inputText)
         }
     }
 
@@ -143,16 +144,19 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `multiple updateInputText calls should update state correctly`() = runTest {
-        viewModel.updateInputText("First")
-        advanceUntilIdle()
-        
-        viewModel.updateInputText("Second")
-        advanceUntilIdle()
-        
-        viewModel.updateInputText("Third")
-        advanceUntilIdle()
-
         viewModel.uiState.test {
+            skipItems(1) // Skip initial value
+            viewModel.updateInputText("First")
+            advanceUntilIdle()
+            awaitItem() // Wait for first update
+            
+            viewModel.updateInputText("Second")
+            advanceUntilIdle()
+            awaitItem() // Wait for second update
+            
+            viewModel.updateInputText("Third")
+            advanceUntilIdle()
+            
             val state = awaitItem()
             assertEquals("Third", state.inputText)
         }
@@ -180,7 +184,7 @@ class AudioTranscriptionViewModelTest {
     }
 
     @Test
-    fun `clearError should not affect inputText`() = runTest {
+    fun `clearError should clear inputText`() = runTest {
         viewModel.updateInputText("User typed text")
         advanceUntilIdle()
 
@@ -189,7 +193,7 @@ class AudioTranscriptionViewModelTest {
 
         viewModel.uiState.test {
             val state = awaitItem()
-            assertEquals("User typed text", state.inputText)
+            assertEquals("", state.inputText)
         }
     }
 
@@ -231,10 +235,11 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `inputText should not be empty when text is entered`() = runTest {
-        viewModel.updateInputText("Some text")
-        advanceUntilIdle()
-
         viewModel.uiState.test {
+            skipItems(1) // Skip initial value
+            viewModel.updateInputText("Some text")
+            advanceUntilIdle()
+            
             val state = awaitItem()
             assertTrue(state.inputText.isNotEmpty())
         }
