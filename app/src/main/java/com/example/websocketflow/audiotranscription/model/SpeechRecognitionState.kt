@@ -1,4 +1,4 @@
-package com.example.websocketflow.audiotranscription
+package com.example.websocketflow.audiotranscription.model
 
 sealed interface SpeechRecognitionState {
     data object Idle : SpeechRecognitionState

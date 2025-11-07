@@ -1,8 +1,13 @@
-package com.example.websocketflow.audiotranscription
+package com.example.websocketflow.audiotranscription.viewmodel
 
 import app.cash.turbine.test
+import com.example.websocketflow.audiotranscription.manager.SpeechRecognitionManager
+import com.example.websocketflow.audiotranscription.model.AudioTranscriptionState
+import com.example.websocketflow.audiotranscription.model.SpeechRecognitionState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -20,11 +25,13 @@ class AudioTranscriptionViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var viewModel: AudioTranscriptionViewModel
+    private lateinit var mockManager: MockSpeechRecognitionManager
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = AudioTranscriptionViewModel()
+        mockManager = MockSpeechRecognitionManager()
+        viewModel = AudioTranscriptionViewModel(mockManager)
     }
 
     @After
@@ -33,19 +40,16 @@ class AudioTranscriptionViewModelTest {
     }
 
     @Test
-    fun `initial state should be empty`() = runTest {
+    fun `initial state should be Idle`() = runTest {
         viewModel.uiState.test {
             val initialState = awaitItem()
-            assertEquals(false, initialState.isRecording)
-            assertEquals("", initialState.transcriptionResult)
-            assertEquals("", initialState.errorMessage)
+            assertTrue(initialState is AudioTranscriptionState.Idle)
             assertEquals("", initialState.inputText)
-            assertEquals(false, initialState.isTyping)
         }
     }
 
     @Test
-    fun `updateInputText should update inputText and set isTyping to true`() = runTest {
+    fun `updateInputText should update inputText`() = runTest {
         val testText = "Hello World"
         
         viewModel.updateInputText(testText)
@@ -54,12 +58,12 @@ class AudioTranscriptionViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals(testText, state.inputText)
-            assertTrue(state.isTyping)
+            assertTrue(state is AudioTranscriptionState.Ready || state.inputText.isNotEmpty())
         }
     }
 
     @Test
-    fun `updateInputText with empty string should set isTyping to false`() = runTest {
+    fun `updateInputText with empty string should set to Idle`() = runTest {
         viewModel.updateInputText("Hello")
         advanceUntilIdle()
         
@@ -69,23 +73,20 @@ class AudioTranscriptionViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
-            assertFalse(state.isTyping)
+            assertTrue(state is AudioTranscriptionState.Idle)
         }
     }
 
     @Test
-    fun `clearTranscription should clear transcriptionResult and errorMessage but keep inputText`() = runTest {
+    fun `clearError should clear transcription but keep inputText`() = runTest {
         viewModel.updateInputText("Test transcription")
         advanceUntilIdle()
 
-        viewModel.clearTranscription()
+        viewModel.clearError()
         advanceUntilIdle()
 
         viewModel.uiState.test {
             val state = awaitItem()
-            assertEquals("", state.transcriptionResult)
-            assertEquals("", state.errorMessage)
-            // inputText should remain unchanged
             assertEquals("Test transcription", state.inputText)
         }
     }
@@ -98,12 +99,12 @@ class AudioTranscriptionViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
-            assertFalse(state.isTyping)
+            assertTrue(state is AudioTranscriptionState.Idle)
         }
     }
 
     @Test
-    fun `sendMessage with non-empty input should clear all fields`() = runTest {
+    fun `sendMessage with non-empty input should clear inputText`() = runTest {
         viewModel.updateInputText("Test message")
         advanceUntilIdle()
 
@@ -113,33 +114,31 @@ class AudioTranscriptionViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
-            assertEquals("", state.transcriptionResult)
-            assertEquals("", state.errorMessage)
-            assertFalse(state.isTyping)
+            assertTrue(state is AudioTranscriptionState.Idle)
         }
     }
 
     @Test
-    fun `clearError should clear errorMessage`() = runTest {
+    fun `clearError should clear error message`() = runTest {
+        // Simulate an error state
+        mockManager.setState(SpeechRecognitionState.Error("Test error"))
+        advanceUntilIdle()
+        
         viewModel.clearError()
         advanceUntilIdle()
 
         viewModel.uiState.test {
             val state = awaitItem()
-            assertEquals("", state.errorMessage)
+            assertFalse(state is AudioTranscriptionState.Error)
         }
     }
 
     @Test
-    fun `stopRecording should set isRecording to false and isTyping to false`() = runTest {
+    fun `stopRecording should call manager stopRecording`() = runTest {
         viewModel.stopRecording()
         advanceUntilIdle()
-
-        viewModel.uiState.test {
-            val state = awaitItem()
-            assertFalse(state.isRecording)
-            assertFalse(state.isTyping)
-        }
+        
+        assertTrue(mockManager.stopRecordingCalled)
     }
 
     @Test
@@ -156,7 +155,6 @@ class AudioTranscriptionViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("Third", state.inputText)
-            assertTrue(state.isTyping)
         }
     }
 
@@ -177,23 +175,21 @@ class AudioTranscriptionViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
-            assertFalse(state.isTyping)
+            assertTrue(state is AudioTranscriptionState.Idle)
         }
     }
 
     @Test
-    fun `clearTranscription should not affect inputText`() = runTest {
+    fun `clearError should not affect inputText`() = runTest {
         viewModel.updateInputText("User typed text")
         advanceUntilIdle()
 
-        viewModel.clearTranscription()
+        viewModel.clearError()
         advanceUntilIdle()
 
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("User typed text", state.inputText)
-            assertEquals("", state.transcriptionResult)
-            assertEquals("", state.errorMessage)
         }
     }
 
@@ -214,14 +210,12 @@ class AudioTranscriptionViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
-            assertEquals("", state.transcriptionResult)
-            assertEquals("", state.errorMessage)
-            assertFalse(state.isTyping)
+            assertTrue(state is AudioTranscriptionState.Idle)
         }
     }
 
     @Test
-    fun `isTyping should be false when inputText is empty`() = runTest {
+    fun `inputText should be empty when state is Idle`() = runTest {
         viewModel.updateInputText("Test")
         advanceUntilIdle()
         
@@ -230,20 +224,51 @@ class AudioTranscriptionViewModelTest {
 
         viewModel.uiState.test {
             val state = awaitItem()
-            assertFalse(state.isTyping)
             assertEquals("", state.inputText)
+            assertTrue(state is AudioTranscriptionState.Idle)
         }
     }
 
     @Test
-    fun `isTyping should be true when inputText is not empty`() = runTest {
+    fun `inputText should not be empty when text is entered`() = runTest {
         viewModel.updateInputText("Some text")
         advanceUntilIdle()
 
         viewModel.uiState.test {
             val state = awaitItem()
-            assertTrue(state.isTyping)
             assertTrue(state.inputText.isNotEmpty())
+        }
+    }
+
+    // Mock implementation for testing
+    private class MockSpeechRecognitionManager : SpeechRecognitionManager {
+        private val _state = MutableStateFlow<SpeechRecognitionState>(SpeechRecognitionState.Idle)
+        override val state: StateFlow<SpeechRecognitionState> = _state
+
+        var stopRecordingCalled = false
+        var startRecordingCalled = false
+        var clearTranscriptionCalled = false
+        var destroyCalled = false
+
+        fun setState(newState: SpeechRecognitionState) {
+            _state.value = newState
+        }
+
+        override fun startRecording() {
+            startRecordingCalled = true
+        }
+
+        override fun stopRecording() {
+            stopRecordingCalled = true
+        }
+
+        override fun clearTranscription() {
+            clearTranscriptionCalled = true
+            _state.value = SpeechRecognitionState.Idle
+        }
+
+        override fun destroy() {
+            destroyCalled = true
         }
     }
 }

@@ -34,8 +34,8 @@ import okhttp3.Request
 import com.example.websocketflow.ui.theme.WebSocketFlowExampleTheme
 import com.example.websocketflow.websocket.WebSocketManager
 import com.example.websocketflow.websocket.WebSocketMessage
-import com.example.websocketflow.audiotranscription.AudioTranscriptionViewModel
-import com.example.websocketflow.audiotranscription.AudioTranscriptionState
+import com.example.websocketflow.audiotranscription.model.AudioTranscriptionState
+import com.example.websocketflow.audiotranscription.viewmodel.AudioTranscriptionViewModel
 import org.koin.androidx.compose.koinViewModel
 import com.example.websocketflow.invoice.InvoiceCreationScreen
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -376,7 +376,7 @@ fun AudioTranscriptionScreen(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            viewModel.startRecording(context)
+            viewModel.startRecording()
         } else {
             // Handle permission denied
         }
@@ -389,7 +389,7 @@ fun AudioTranscriptionScreen(
                 context,
                 Manifest.permission.RECORD_AUDIO
             ) == PackageManager.PERMISSION_GRANTED -> {
-                viewModel.startRecording(context)
+                viewModel.startRecording()
             }
             else -> {
                 permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -556,7 +556,7 @@ fun AudioTranscriptionScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 OutlinedButton(
-                    onClick = { viewModel.clearTranscription() },
+                    onClick = { viewModel.clearError() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(

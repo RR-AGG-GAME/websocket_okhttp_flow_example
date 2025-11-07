@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -15,18 +17,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
-import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.Manifest
 import android.widget.Toast
 import org.koin.androidx.compose.koinViewModel
-import com.example.websocketflow.audiotranscription.AudioTranscriptionViewModel
-import com.example.websocketflow.audiotranscription.AudioTranscriptionState
+import com.example.websocketflow.audiotranscription.model.AudioTranscriptionState
+import com.example.websocketflow.audiotranscription.viewmodel.AudioTranscriptionViewModel
 
 @Composable
 fun ChatInputField(
@@ -38,18 +41,36 @@ fun ChatInputField(
     onVoiceStart: () -> Unit,
     onVoiceStop: () -> Unit
 ) {
+    var textFieldValue by remember { 
+        mutableStateOf(TextFieldValue(inputText, selection = TextRange(inputText.length)))
+    }
+    
+    // Update TextFieldValue when inputText changes (e.g., from transcription)
+    // Set cursor to end of text
+    LaunchedEffect(inputText) {
+        if (textFieldValue.text != inputText) {
+            textFieldValue = TextFieldValue(inputText, selection = TextRange(inputText.length))
+        }
+    }
+    
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         OutlinedTextField(
-            value = inputText,
-            onValueChange = onTextChange,
+            value = textFieldValue,
+            onValueChange = { newValue ->
+                textFieldValue = newValue
+                onTextChange(newValue.text)
+            },
             label = { Text("Enter customer, items, amount") },
             placeholder = { Text("Enter customer, items, amount") },
             trailingIcon = {
                 if (inputText.isNotEmpty() && !isRecording) {
-                    IconButton(onClick = { onTextChange("") }) {
+                    IconButton(onClick = { 
+                        textFieldValue = TextFieldValue("")
+                        onTextChange("") 
+                    }) {
                         Icon(Icons.Default.Close, "Clear", tint = Color.Gray)
                     }
                 }
@@ -69,7 +90,9 @@ fun ChatInputField(
             maxLines = 5,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
             keyboardActions = KeyboardActions(onNext = { 
-                onTextChange(inputText + "\n")
+                val newText = textFieldValue.text + "\n"
+                textFieldValue = TextFieldValue(newText, selection = TextRange(newText.length))
+                onTextChange(newText)
             })
         )
         
@@ -127,20 +150,15 @@ fun InvoiceCreationScreen(
     viewModel: AudioTranscriptionViewModel = koinViewModel()
 ) {
     val context = LocalContext.current
-    val activity = context as? Activity
     val uiState by viewModel.uiState.collectAsState()
     
-    var inputText by remember { mutableStateOf("") }
+    val messages = remember { mutableStateListOf<String>() }
     
     val currentState = uiState
+    val inputText = currentState.inputText
     val isRecording = currentState is AudioTranscriptionState.Recording || 
                      currentState is AudioTranscriptionState.Transcribing
     val isTyping = currentState.inputText.isNotEmpty()
-    val transcriptionResult = when (currentState) {
-        is AudioTranscriptionState.Transcribing -> currentState.transcriptionResult
-        is AudioTranscriptionState.Ready -> currentState.transcriptionResult
-        else -> ""
-    }
     val errorMessage = when (currentState) {
         is AudioTranscriptionState.Error -> currentState.message
         else -> ""
@@ -149,21 +167,14 @@ fun InvoiceCreationScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (isGranted && activity != null) {
-            viewModel.startRecording(activity)
+        if (isGranted) {
+            viewModel.startRecording()
         } else {
             Toast.makeText(
                 context,
                 "Audio recording permission is required",
                 Toast.LENGTH_LONG
             ).show()
-        }
-    }
-    
-    LaunchedEffect(transcriptionResult) {
-        if (transcriptionResult.isNotEmpty() && isRecording) {
-            inputText = transcriptionResult
-            viewModel.updateInputText(transcriptionResult)
         }
     }
     
@@ -179,23 +190,41 @@ fun InvoiceCreationScreen(
             .fillMaxSize()
             .padding(16.dp)
     ) {
+        LazyColumn(
+            modifier = Modifier.weight(1f)
+        ) {
+            items(messages) { message ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    Text(
+                        text = message,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
         ChatInputField(
             inputText = inputText,
             onTextChange = { 
-                inputText = it
                 viewModel.updateInputText(it)
             },
             isRecording = isRecording,
             isTyping = isTyping,
             onSend = {
-                viewModel.sendMessage()
-                inputText = ""
-            },
-            onVoiceStart = {
-                if (activity != null) {
-                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                if (inputText.isNotEmpty()) {
+                    messages.add(inputText)
+                    viewModel.sendMessage()
                 }
             },
+                    onVoiceStart = {
+                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    },
             onVoiceStop = {
                 viewModel.stopRecording()
             }

@@ -1,4 +1,4 @@
-package com.example.websocketflow.audiotranscription
+package com.example.websocketflow.audiotranscription.model
 
 sealed interface AudioTranscriptionState {
     val inputText: String
@@ -26,3 +26,4 @@ sealed interface AudioTranscriptionState {
         override val inputText: String
     ) : AudioTranscriptionState
 }
+
