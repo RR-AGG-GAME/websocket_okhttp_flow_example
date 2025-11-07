@@ -28,7 +28,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.Manifest
 import android.widget.Toast
 import org.koin.androidx.compose.koinViewModel
-import com.example.websocketflow.audiotranscription.model.AudioTranscriptionState
+import com.example.websocketflow.audiotranscription.model.TranscriptionUiState
 import com.example.websocketflow.audiotranscription.viewmodel.AudioTranscriptionViewModel
 
 @Composable
@@ -159,11 +159,11 @@ fun InvoiceCreationScreen(
     
     val currentState = uiState
     val inputText = currentState.inputText
-    val isRecording = currentState is AudioTranscriptionState.Recording || 
-                     currentState is AudioTranscriptionState.Transcribing
+    val isRecording = currentState is TranscriptionUiState.Recording || 
+                     currentState is TranscriptionUiState.Transcribing
     val isTyping = currentState.inputText.isNotEmpty()
     val errorMessage = when (currentState) {
-        is AudioTranscriptionState.Error -> currentState.errorMessage
+        is TranscriptionUiState.Error -> currentState.errorMessage
         else -> ""
     }
     

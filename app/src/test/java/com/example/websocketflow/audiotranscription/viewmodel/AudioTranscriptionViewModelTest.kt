@@ -2,7 +2,7 @@ package com.example.websocketflow.audiotranscription.viewmodel
 
 import app.cash.turbine.test
 import com.example.websocketflow.audiotranscription.manager.SpeechRecognitionManager
-import com.example.websocketflow.audiotranscription.model.AudioTranscriptionState
+import com.example.websocketflow.audiotranscription.model.TranscriptionUiState
 import com.example.websocketflow.audiotranscription.model.SpeechRecognitionState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -43,7 +43,7 @@ class AudioTranscriptionViewModelTest {
     fun `initial state should be Idle`() = runTest {
         viewModel.uiState.test {
             val initialState = awaitItem()
-            assertTrue(initialState is AudioTranscriptionState.Idle)
+            assertTrue(initialState is TranscriptionUiState.Idle)
             assertEquals("", initialState.inputText)
         }
     }
@@ -58,7 +58,7 @@ class AudioTranscriptionViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals(testText, state.inputText)
-            assertTrue(state is AudioTranscriptionState.Ready || state.inputText.isNotEmpty())
+            assertTrue(state.inputText.isNotEmpty())
         }
     }
 
@@ -73,7 +73,7 @@ class AudioTranscriptionViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
-            assertTrue(state is AudioTranscriptionState.Idle)
+            assertTrue(state is TranscriptionUiState.Idle)
         }
     }
 
@@ -99,7 +99,7 @@ class AudioTranscriptionViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
-            assertTrue(state is AudioTranscriptionState.Idle)
+            assertTrue(state is TranscriptionUiState.Idle)
         }
     }
 
@@ -114,7 +114,7 @@ class AudioTranscriptionViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
-            assertTrue(state is AudioTranscriptionState.Idle)
+            assertTrue(state is TranscriptionUiState.Idle)
         }
     }
 
@@ -129,7 +129,7 @@ class AudioTranscriptionViewModelTest {
 
         viewModel.uiState.test {
             val state = awaitItem()
-            assertFalse(state is AudioTranscriptionState.Error)
+            assertFalse(state is TranscriptionUiState.Error)
         }
     }
 
@@ -175,7 +175,7 @@ class AudioTranscriptionViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
-            assertTrue(state is AudioTranscriptionState.Idle)
+            assertTrue(state is TranscriptionUiState.Idle)
         }
     }
 
@@ -210,7 +210,7 @@ class AudioTranscriptionViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
-            assertTrue(state is AudioTranscriptionState.Idle)
+            assertTrue(state is TranscriptionUiState.Idle)
         }
     }
 
@@ -225,7 +225,7 @@ class AudioTranscriptionViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
-            assertTrue(state is AudioTranscriptionState.Idle)
+            assertTrue(state is TranscriptionUiState.Idle)
         }
     }
 

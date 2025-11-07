@@ -3,7 +3,7 @@ package com.example.websocketflow.audiotranscription.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.websocketflow.audiotranscription.manager.SpeechRecognitionManager
-import com.example.websocketflow.audiotranscription.model.AudioTranscriptionState
+import com.example.websocketflow.audiotranscription.model.TranscriptionUiState
 import com.example.websocketflow.audiotranscription.model.SpeechRecognitionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,20 +35,20 @@ class AudioTranscriptionViewModel(
         }
     }
     
-    val uiState: StateFlow<AudioTranscriptionState> = combine(
+    val uiState: StateFlow<TranscriptionUiState> = combine(
         speechRecognitionManager.state.scan(
-            initial = AudioTranscriptionState.Idle as AudioTranscriptionState
-        ) { current: AudioTranscriptionState, recognitionState: SpeechRecognitionState ->
-            AudioTranscriptionStateMapper.map(recognitionState, current)
+            initial = TranscriptionUiState.Idle() as TranscriptionUiState
+        ) { current: TranscriptionUiState, recognitionState: SpeechRecognitionState ->
+            TranscriptionUiStateMapper.map(recognitionState, current)
         },
         _inputText
-    ) { mappedState: AudioTranscriptionState, inputText: String ->
-        AudioTranscriptionStateMapper.updateInputText(mappedState, inputText)
+    ) { mappedState: TranscriptionUiState, inputText: String ->
+        TranscriptionUiStateMapper.updateInput(mappedState, inputText)
     }
         .stateIn(
             scope = viewModelScope,
             started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
-            initialValue = AudioTranscriptionState.Idle
+            initialValue = TranscriptionUiState.Idle()
         )
 
     fun startRecording() {
@@ -62,22 +62,25 @@ class AudioTranscriptionViewModel(
 
     fun updateInputText(text: String) {
         val currentState = uiState.value
-        if (currentState is AudioTranscriptionState.Recording) return
+        if (currentState is TranscriptionUiState.Recording) return
         _inputText.value = text
     }
 
     fun sendMessage() {
         if (_inputText.value.isEmpty()) return
         val currentState = uiState.value
-        if (currentState is AudioTranscriptionState.Recording || 
-            currentState is AudioTranscriptionState.Transcribing) {
+        if (currentState is TranscriptionUiState.Recording || 
+            currentState is TranscriptionUiState.Transcribing) {
             speechRecognitionManager.stopRecording()
         }
         speechRecognitionManager.clearTranscription()
         _inputText.value = ""
     }
 
-    fun clearError() = speechRecognitionManager.clearTranscription()
+    fun clearError() {
+        speechRecognitionManager.clearTranscription()
+        _inputText.value = ""
+    }
 
     override fun onCleared() {
         super.onCleared()

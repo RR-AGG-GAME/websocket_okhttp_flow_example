@@ -1,26 +1,22 @@
 package com.example.websocketflow.audiotranscription.model
 
-sealed interface AudioTranscriptionState {
+sealed interface TranscriptionUiState {
     val inputText: String
     
-    data object Idle : AudioTranscriptionState {
+    data class Idle(
         override val inputText: String = ""
-    }
+    ) : TranscriptionUiState
     
     data class Recording(
         override val inputText: String = ""
-    ) : AudioTranscriptionState
+    ) : TranscriptionUiState
     
     data class Transcribing(
         override val inputText: String
-    ) : AudioTranscriptionState
+    ) : TranscriptionUiState
     
     data class Error(
         val errorMessage: String,
         override val inputText: String = ""
-    ) : AudioTranscriptionState
-    
-    data class Ready(
-        override val inputText: String
-    ) : AudioTranscriptionState
+    ) : TranscriptionUiState
 }

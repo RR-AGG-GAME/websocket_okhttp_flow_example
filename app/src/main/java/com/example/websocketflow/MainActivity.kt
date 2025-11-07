@@ -34,7 +34,7 @@ import okhttp3.Request
 import com.example.websocketflow.ui.theme.WebSocketFlowExampleTheme
 import com.example.websocketflow.websocket.WebSocketManager
 import com.example.websocketflow.websocket.WebSocketMessage
-import com.example.websocketflow.audiotranscription.model.AudioTranscriptionState
+import com.example.websocketflow.audiotranscription.model.TranscriptionUiState
 import com.example.websocketflow.audiotranscription.viewmodel.AudioTranscriptionViewModel
 import org.koin.androidx.compose.koinViewModel
 import com.example.websocketflow.invoice.InvoiceCreationScreen
@@ -360,14 +360,14 @@ fun AudioTranscriptionScreen(
     
     // Helper values from sealed interface
     val currentState = uiState
-    val isRecording = currentState is AudioTranscriptionState.Recording || currentState is AudioTranscriptionState.Transcribing
+    val isRecording = currentState is TranscriptionUiState.Recording || currentState is TranscriptionUiState.Transcribing
     val transcriptionResult = when (currentState) {
-        is AudioTranscriptionState.Transcribing -> currentState.inputText
-        is AudioTranscriptionState.Ready -> currentState.inputText
+        is TranscriptionUiState.Transcribing -> currentState.inputText
+        is TranscriptionUiState.Idle -> currentState.inputText
         else -> ""
     }
     val errorMessage = when (currentState) {
-        is AudioTranscriptionState.Error -> currentState.errorMessage
+        is TranscriptionUiState.Error -> currentState.errorMessage
         else -> ""
     }
     
