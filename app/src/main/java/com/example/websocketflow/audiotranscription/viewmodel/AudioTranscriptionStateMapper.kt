@@ -12,19 +12,13 @@ object AudioTranscriptionStateMapper {
         is SpeechRecognitionState.Recording -> 
             AudioTranscriptionState.Recording(currentUiState.inputText)
         is SpeechRecognitionState.Transcribing -> 
-            AudioTranscriptionState.Transcribing(
-                recognitionState.transcriptionResult,
-                currentUiState.inputText
-            )
+            AudioTranscriptionState.Transcribing(recognitionState.transcriptionResult)
         is SpeechRecognitionState.Ready -> 
-            AudioTranscriptionState.Ready(
-                recognitionState.transcriptionResult,
-                currentUiState.inputText
-            )
+            AudioTranscriptionState.Ready(recognitionState.transcriptionResult)
         is SpeechRecognitionState.Error -> 
             AudioTranscriptionState.Error(
-                recognitionState.message,
-                currentUiState.inputText
+                errorMessage = recognitionState.message,
+                inputText = currentUiState.inputText
             )
     }
     
@@ -34,11 +28,11 @@ object AudioTranscriptionStateMapper {
     ): AudioTranscriptionState = when (state) {
         is AudioTranscriptionState.Recording -> AudioTranscriptionState.Recording(inputText)
         is AudioTranscriptionState.Transcribing -> 
-            AudioTranscriptionState.Transcribing(state.transcriptionResult, inputText)
+            AudioTranscriptionState.Transcribing(inputText)
         is AudioTranscriptionState.Ready -> 
-            AudioTranscriptionState.Ready(state.transcriptionResult, inputText)
+            AudioTranscriptionState.Ready(inputText)
         is AudioTranscriptionState.Error -> 
-            AudioTranscriptionState.Error(state.message, inputText)
+            AudioTranscriptionState.Error(state.errorMessage, inputText)
         is AudioTranscriptionState.Idle -> AudioTranscriptionState.Idle
     }
 }

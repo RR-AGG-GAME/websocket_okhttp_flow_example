@@ -61,6 +61,8 @@ class AudioTranscriptionViewModel(
     }
 
     fun updateInputText(text: String) {
+        val currentState = uiState.value
+        if (currentState is AudioTranscriptionState.Recording) return
         _inputText.value = text
     }
 

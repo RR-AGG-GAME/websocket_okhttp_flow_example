@@ -12,18 +12,15 @@ sealed interface AudioTranscriptionState {
     ) : AudioTranscriptionState
     
     data class Transcribing(
-        val transcriptionResult: String,
         override val inputText: String
     ) : AudioTranscriptionState
     
     data class Error(
-        val message: String,
+        val errorMessage: String,
         override val inputText: String = ""
     ) : AudioTranscriptionState
     
     data class Ready(
-        val transcriptionResult: String,
         override val inputText: String
     ) : AudioTranscriptionState
 }
-

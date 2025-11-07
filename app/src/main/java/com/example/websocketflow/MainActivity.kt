@@ -362,12 +362,12 @@ fun AudioTranscriptionScreen(
     val currentState = uiState
     val isRecording = currentState is AudioTranscriptionState.Recording || currentState is AudioTranscriptionState.Transcribing
     val transcriptionResult = when (currentState) {
-        is AudioTranscriptionState.Transcribing -> currentState.transcriptionResult
-        is AudioTranscriptionState.Ready -> currentState.transcriptionResult
+        is AudioTranscriptionState.Transcribing -> currentState.inputText
+        is AudioTranscriptionState.Ready -> currentState.inputText
         else -> ""
     }
     val errorMessage = when (currentState) {
-        is AudioTranscriptionState.Error -> currentState.message
+        is AudioTranscriptionState.Error -> currentState.errorMessage
         else -> ""
     }
     

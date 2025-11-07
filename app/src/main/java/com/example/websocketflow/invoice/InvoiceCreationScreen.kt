@@ -60,9 +60,12 @@ fun ChatInputField(
         OutlinedTextField(
             value = textFieldValue,
             onValueChange = { newValue ->
-                textFieldValue = newValue
-                onTextChange(newValue.text)
+                if (!isRecording) {
+                    textFieldValue = newValue
+                    onTextChange(newValue.text)
+                }
             },
+            enabled = !isRecording,
             label = { Text("Enter customer, items, amount") },
             placeholder = { Text("Enter customer, items, amount") },
             trailingIcon = {
@@ -160,7 +163,7 @@ fun InvoiceCreationScreen(
                      currentState is AudioTranscriptionState.Transcribing
     val isTyping = currentState.inputText.isNotEmpty()
     val errorMessage = when (currentState) {
-        is AudioTranscriptionState.Error -> currentState.message
+        is AudioTranscriptionState.Error -> currentState.errorMessage
         else -> ""
     }
     
