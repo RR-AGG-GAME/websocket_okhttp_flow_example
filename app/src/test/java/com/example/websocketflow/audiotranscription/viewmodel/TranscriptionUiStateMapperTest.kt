@@ -2,9 +2,9 @@ package com.example.websocketflow.audiotranscription.viewmodel
 
 import com.example.websocketflow.audiotranscription.model.TranscriptionUiState
 import com.example.websocketflow.audiotranscription.model.SpeechRecognitionState
-import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
 
 class TranscriptionUiStateMapperTest {
 
@@ -20,7 +20,7 @@ class TranscriptionUiStateMapperTest {
         val currentState = defaultIdleState.copy(inputText = "existing text")
 
         // Act
-        val result = TranscriptionUiStateMapper.map(recognitionState, currentState)
+        val result = TranscriptionUiStateMapper.map(recognitionState, currentUiState = currentState)
 
         // Assert
         assertTrue(result is TranscriptionUiState.Idle)
@@ -34,7 +34,7 @@ class TranscriptionUiStateMapperTest {
         val currentState = defaultRecordingState.copy(inputText = "existing text")
 
         // Act
-        val result = TranscriptionUiStateMapper.map(recognitionState, currentState)
+        val result = TranscriptionUiStateMapper.map(recognitionState, currentUiState = currentState)
 
         // Assert
         assertTrue(result is TranscriptionUiState.Idle)
@@ -48,7 +48,7 @@ class TranscriptionUiStateMapperTest {
         val currentState = defaultIdleState.copy(inputText = "existing text")
 
         // Act
-        val result = TranscriptionUiStateMapper.map(recognitionState, currentState)
+        val result = TranscriptionUiStateMapper.map(recognitionState, currentUiState = currentState)
 
         // Assert
         assertTrue(result is TranscriptionUiState.Recording)
@@ -62,7 +62,7 @@ class TranscriptionUiStateMapperTest {
         val currentState = defaultRecordingState.copy(inputText = "old text")
 
         // Act
-        val result = TranscriptionUiStateMapper.map(recognitionState, currentState)
+        val result = TranscriptionUiStateMapper.map(recognitionState, currentUiState = currentState)
 
         // Assert
         assertTrue(result is TranscriptionUiState.Transcribing)
@@ -76,12 +76,13 @@ class TranscriptionUiStateMapperTest {
         val currentState = defaultTranscribingState
 
         // Act
-        val result = TranscriptionUiStateMapper.map(recognitionState, currentState)
+        val result = TranscriptionUiStateMapper.map(recognitionState, currentUiState = currentState)
 
         // Assert
         assertTrue(result is TranscriptionUiState.Error)
-        assertEquals("Test error message", result.errorMessage)
-        assertEquals("existing text", result.inputText)
+        val errorState = result as TranscriptionUiState.Error
+        assertEquals("Test error message", errorState.errorMessage)
+        assertEquals("existing text", errorState.inputText)
     }
 
     @Test
@@ -137,8 +138,9 @@ class TranscriptionUiStateMapperTest {
 
         // Assert
         assertTrue(result is TranscriptionUiState.Error)
-        assertEquals("error message", result.errorMessage)
-        assertEquals(newText, result.inputText)
+        val errorState = result as TranscriptionUiState.Error
+        assertEquals("error message", errorState.errorMessage)
+        assertEquals(newText, errorState.inputText)
     }
 
     @Test
@@ -167,7 +169,7 @@ class TranscriptionUiStateMapperTest {
 
         // Act & Assert
         recognitionStates.forEach { recognitionState ->
-            currentState = TranscriptionUiStateMapper.map(recognitionState, currentState)
+            currentState = TranscriptionUiStateMapper.map(recognitionState, currentUiState = currentState)
             assertEquals(preservedText, currentState.inputText)
         }
     }
