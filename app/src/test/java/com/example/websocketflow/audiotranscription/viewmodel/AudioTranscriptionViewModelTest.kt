@@ -27,6 +27,12 @@ class AudioTranscriptionViewModelTest {
     private lateinit var viewModel: AudioTranscriptionViewModel
     private lateinit var mockManager: MockSpeechRecognitionManager
 
+    private val defaultIdleState = SpeechRecognitionState.Idle
+    private val defaultRecordingState = SpeechRecognitionState.Recording
+    private val defaultTranscribingState = SpeechRecognitionState.Transcribing("partial transcription")
+    private val defaultReadyState = SpeechRecognitionState.Ready("final transcription")
+    private val defaultErrorState = SpeechRecognitionState.Error("Test error message")
+
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
@@ -41,8 +47,11 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `initial state should be Idle`() = runTest {
+        // Arrange & Act
         viewModel.uiState.test {
             val initialState = awaitItem()
+
+            // Assert
             assertTrue(initialState is TranscriptionUiState.Idle)
             assertEquals("", initialState.inputText)
         }
@@ -50,13 +59,16 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `updateInputText should update inputText`() = runTest {
+        // Arrange
         val testText = "Hello World"
-        
+
+        // Act
         viewModel.uiState.test {
             skipItems(1) // Skip initial value
             viewModel.updateInputText(testText)
             advanceUntilIdle()
-            
+
+            // Assert
             val state = awaitItem()
             assertEquals(testText, state.inputText)
             assertTrue(state.inputText.isNotEmpty())
@@ -65,12 +77,15 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `updateInputText with empty string should set to Idle`() = runTest {
+        // Arrange
         viewModel.updateInputText("Hello")
         advanceUntilIdle()
-        
+
+        // Act
         viewModel.updateInputText("")
         advanceUntilIdle()
 
+        // Assert
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
@@ -80,12 +95,15 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `clearError should clear transcription and inputText`() = runTest {
+        // Arrange
         viewModel.updateInputText("Test transcription")
         advanceUntilIdle()
 
+        // Act
         viewModel.clearError()
         advanceUntilIdle()
 
+        // Assert
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
@@ -94,9 +112,11 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `sendMessage with empty input should not change state`() = runTest {
+        // Act
         viewModel.sendMessage()
         advanceUntilIdle()
 
+        // Assert
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
@@ -106,12 +126,15 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `sendMessage with non-empty input should clear inputText`() = runTest {
+        // Arrange
         viewModel.updateInputText("Test message")
         advanceUntilIdle()
 
+        // Act
         viewModel.sendMessage()
         advanceUntilIdle()
 
+        // Assert
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
@@ -121,13 +144,15 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `clearError should clear error message`() = runTest {
-        // Simulate an error state
-        mockManager.setState(SpeechRecognitionState.Error("Test error"))
+        // Arrange
+        mockManager.setState(defaultErrorState.copy(message = "Test error"))
         advanceUntilIdle()
-        
+
+        // Act
         viewModel.clearError()
         advanceUntilIdle()
 
+        // Assert
         viewModel.uiState.test {
             val state = awaitItem()
             assertFalse(state is TranscriptionUiState.Error)
@@ -136,9 +161,11 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `stopRecording should call manager stopRecording`() = runTest {
+        // Act
         viewModel.stopRecording()
         advanceUntilIdle()
-        
+
+        // Assert
         assertTrue(mockManager.stopRecordingCalled)
     }
 
@@ -247,12 +274,15 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `startRecording should clear inputText and call manager`() = runTest {
+        // Arrange
         viewModel.updateInputText("Existing text")
         advanceUntilIdle()
-        
+
+        // Act
         viewModel.startRecording()
         advanceUntilIdle()
-        
+
+        // Assert
         assertTrue(mockManager.startRecordingCalled)
         viewModel.uiState.test {
             val state = awaitItem()
@@ -262,9 +292,11 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `startRecording should transition to Recording state`() = runTest {
-        mockManager.setState(SpeechRecognitionState.Recording)
+        // Arrange
+        mockManager.setState(defaultRecordingState)
         advanceUntilIdle()
-        
+
+        // Assert
         viewModel.uiState.test {
             skipItems(1) // Skip initial value
             val state = awaitItem()
@@ -274,53 +306,62 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `Transcribing state should update inputText`() = runTest {
-        val transcription = "partial transcription"
-        mockManager.setState(SpeechRecognitionState.Transcribing(transcription))
+        // Arrange
+        val recognitionState = defaultTranscribingState.copy(transcriptionResult = "partial transcription")
+        mockManager.setState(recognitionState)
         advanceUntilIdle()
-        
+
+        // Assert
         viewModel.uiState.test {
             skipItems(1) // Skip initial value
             val state = awaitItem()
             assertTrue(state is TranscriptionUiState.Transcribing)
-            assertEquals(transcription, state.inputText)
+            assertEquals("partial transcription", state.inputText)
         }
     }
 
     @Test
     fun `Ready state should update inputText`() = runTest {
-        val finalTranscription = "final transcription"
-        mockManager.setState(SpeechRecognitionState.Ready(finalTranscription))
+        // Arrange
+        val recognitionState = defaultReadyState.copy(transcriptionResult = "final transcription")
+        mockManager.setState(recognitionState)
         advanceUntilIdle()
-        
+
+        // Assert
         viewModel.uiState.test {
             skipItems(1) // Skip initial value
             val state = awaitItem()
-            assertEquals(finalTranscription, state.inputText)
+            assertEquals("final transcription", state.inputText)
         }
     }
 
     @Test
     fun `Error state should show error message`() = runTest {
-        val errorMessage = "Test error message"
-        mockManager.setState(SpeechRecognitionState.Error(errorMessage))
+        // Arrange
+        val recognitionState = defaultErrorState.copy(message = "Test error message")
+        mockManager.setState(recognitionState)
         advanceUntilIdle()
-        
+
+        // Assert
         viewModel.uiState.test {
             skipItems(1) // Skip initial value
             val state = awaitItem()
             assertTrue(state is TranscriptionUiState.Error)
-            assertEquals(errorMessage, state.errorMessage)
+            assertEquals("Test error message", state.errorMessage)
         }
     }
 
     @Test
     fun `updateInputText during Recording should not update`() = runTest {
-        mockManager.setState(SpeechRecognitionState.Recording)
+        // Arrange
+        mockManager.setState(defaultRecordingState)
         advanceUntilIdle()
-        
+
+        // Act
         viewModel.updateInputText("Should not update")
         advanceUntilIdle()
-        
+
+        // Assert
         val currentState = viewModel.uiState.value
         assertTrue(currentState is TranscriptionUiState.Recording)
         assertEquals("", currentState.inputText)
@@ -328,50 +369,56 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `sendMessage during Recording should stop recording`() = runTest {
+        // Arrange
         viewModel.updateInputText("Test message")
         advanceUntilIdle()
-        
-        mockManager.setState(SpeechRecognitionState.Recording)
+        mockManager.setState(defaultRecordingState)
         advanceUntilIdle()
-        
         mockManager.stopRecordingCalled = false
         mockManager.clearTranscriptionCalled = false
+
+        // Act
         viewModel.sendMessage()
         advanceUntilIdle()
-        
+
+        // Assert
         assertTrue(mockManager.stopRecordingCalled)
         assertTrue(mockManager.clearTranscriptionCalled)
     }
 
     @Test
     fun `sendMessage during Transcribing should stop recording`() = runTest {
+        // Arrange
         viewModel.updateInputText("Test message")
         advanceUntilIdle()
-        
-        mockManager.setState(SpeechRecognitionState.Transcribing("transcription"))
+        mockManager.setState(defaultTranscribingState.copy(transcriptionResult = "transcription"))
         advanceUntilIdle()
-        
         mockManager.stopRecordingCalled = false
         mockManager.clearTranscriptionCalled = false
+
+        // Act
         viewModel.sendMessage()
         advanceUntilIdle()
-        
+
+        // Assert
         assertTrue(mockManager.stopRecordingCalled)
         assertTrue(mockManager.clearTranscriptionCalled)
     }
 
     @Test
     fun `sendMessage when Idle should not call stopRecording`() = runTest {
+        // Arrange
         viewModel.updateInputText("Test message")
         advanceUntilIdle()
-        
-        mockManager.setState(SpeechRecognitionState.Idle)
+        mockManager.setState(defaultIdleState)
         advanceUntilIdle()
-        
         mockManager.stopRecordingCalled = false
+
+        // Act
         viewModel.sendMessage()
         advanceUntilIdle()
-        
+
+        // Assert
         assertFalse(mockManager.stopRecordingCalled)
         assertTrue(mockManager.clearTranscriptionCalled)
     }
@@ -379,17 +426,20 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `state transitions from Idle to Recording to Transcribing`() = runTest {
+        // Arrange & Act
         viewModel.uiState.test {
             skipItems(1) // Skip initial value
-            
-            mockManager.setState(SpeechRecognitionState.Recording)
+
+            mockManager.setState(defaultRecordingState)
             advanceUntilIdle()
             val recordingState = awaitItem()
-            assertTrue(recordingState is TranscriptionUiState.Recording)
-            
-            mockManager.setState(SpeechRecognitionState.Transcribing("test"))
+
+            mockManager.setState(defaultTranscribingState.copy(transcriptionResult = "test"))
             advanceUntilIdle()
             val transcribingState = awaitItem()
+
+            // Assert
+            assertTrue(recordingState is TranscriptionUiState.Recording)
             assertTrue(transcribingState is TranscriptionUiState.Transcribing)
             assertEquals("test", transcribingState.inputText)
         }
@@ -397,19 +447,23 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `multiple Transcribing updates should update inputText`() = runTest {
-        mockManager.setState(SpeechRecognitionState.Transcribing("first"))
+        // Arrange
+        mockManager.setState(defaultTranscribingState.copy(transcriptionResult = "first"))
         advanceUntilIdle()
-        
+
+        // Act & Assert
         viewModel.uiState.test {
             skipItems(1) // Skip initial value
             val firstState = awaitItem()
             assertTrue(firstState is TranscriptionUiState.Transcribing)
             assertEquals("first", firstState.inputText)
         }
-        
-        mockManager.setState(SpeechRecognitionState.Transcribing("second"))
+
+        // Arrange
+        mockManager.setState(defaultTranscribingState.copy(transcriptionResult = "second"))
         advanceUntilIdle()
-        
+
+        // Act & Assert
         viewModel.uiState.test {
             skipItems(1) // Skip initial value
             val secondState = awaitItem()
