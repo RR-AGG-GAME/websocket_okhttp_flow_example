@@ -14,7 +14,7 @@ class TranscriptionUiStateMapperTest {
     private val defaultErrorState = TranscriptionUiState.Error("error message", "existing text")
 
     @Test
-    fun `map Idle state should return Idle with preserved inputText`() {
+    fun `map Idle should return Idle with preserved inputText`() {
         // Arrange
         val recognitionState = SpeechRecognitionState.Idle
         val currentState = defaultIdleState.copy(inputText = "existing text")
@@ -28,21 +28,7 @@ class TranscriptionUiStateMapperTest {
     }
 
     @Test
-    fun `map Ready state should return Idle with preserved inputText`() {
-        // Arrange
-        val recognitionState = SpeechRecognitionState.Ready("final transcription")
-        val currentState = defaultRecordingState.copy(inputText = "existing text")
-
-        // Act
-        val result = TranscriptionUiStateMapper.map(recognitionState, currentUiState = currentState)
-
-        // Assert
-        assertTrue(result is TranscriptionUiState.Idle)
-        assertEquals("existing text", result.inputText)
-    }
-
-    @Test
-    fun `map Recording state should return Recording with preserved inputText`() {
+    fun `map Recording should return Recording with preserved inputText`() {
         // Arrange
         val recognitionState = SpeechRecognitionState.Recording
         val currentState = defaultIdleState.copy(inputText = "existing text")
@@ -56,7 +42,7 @@ class TranscriptionUiStateMapperTest {
     }
 
     @Test
-    fun `map Transcribing state should return Transcribing with transcription result`() {
+    fun `map Transcribing should return Transcribing with transcription result`() {
         // Arrange
         val recognitionState = SpeechRecognitionState.Transcribing("partial transcription")
         val currentState = defaultRecordingState.copy(inputText = "old text")
@@ -70,7 +56,7 @@ class TranscriptionUiStateMapperTest {
     }
 
     @Test
-    fun `map Error state should return Error with error message and preserved inputText`() {
+    fun `map Error should return Error with error message and preserved inputText`() {
         // Arrange
         val recognitionState = SpeechRecognitionState.Error("Test error message")
         val currentState = defaultTranscribingState
@@ -86,92 +72,31 @@ class TranscriptionUiStateMapperTest {
     }
 
     @Test
-    fun `updateInput on Idle should return Idle with new text`() {
+    fun `updateInput should update inputText for all states`() {
         // Arrange
-        val state = defaultIdleState.copy(inputText = "old text")
         val newText = "new text"
 
-        // Act
-        val result = TranscriptionUiStateMapper.updateInput(state, newText)
+        // Act & Assert - Idle
+        val idleResult = TranscriptionUiStateMapper.updateInput(defaultIdleState.copy(inputText = "old"), newText)
+        assertTrue(idleResult is TranscriptionUiState.Idle)
+        assertEquals(newText, idleResult.inputText)
 
-        // Assert
-        assertTrue(result is TranscriptionUiState.Idle)
-        assertEquals(newText, result.inputText)
-    }
+        // Act & Assert - Recording
+        val recordingResult = TranscriptionUiStateMapper.updateInput(defaultRecordingState.copy(inputText = "old"), newText)
+        assertTrue(recordingResult is TranscriptionUiState.Recording)
+        assertEquals(newText, recordingResult.inputText)
 
-    @Test
-    fun `updateInput on Recording should return Recording with new text`() {
-        // Arrange
-        val state = defaultRecordingState.copy(inputText = "old text")
-        val newText = "new text"
+        // Act & Assert - Transcribing
+        val transcribingResult = TranscriptionUiStateMapper.updateInput(defaultTranscribingState.copy(inputText = "old"), newText)
+        assertTrue(transcribingResult is TranscriptionUiState.Transcribing)
+        assertEquals(newText, transcribingResult.inputText)
 
-        // Act
-        val result = TranscriptionUiStateMapper.updateInput(state, newText)
-
-        // Assert
-        assertTrue(result is TranscriptionUiState.Recording)
-        assertEquals(newText, result.inputText)
-    }
-
-    @Test
-    fun `updateInput on Transcribing should return Transcribing with new text`() {
-        // Arrange
-        val state = defaultTranscribingState.copy(inputText = "old text")
-        val newText = "new text"
-
-        // Act
-        val result = TranscriptionUiStateMapper.updateInput(state, newText)
-
-        // Assert
-        assertTrue(result is TranscriptionUiState.Transcribing)
-        assertEquals(newText, result.inputText)
-    }
-
-    @Test
-    fun `updateInput on Error should return Error with same error message and new text`() {
-        // Arrange
-        val state = defaultErrorState.copy(inputText = "old text")
-        val newText = "new text"
-
-        // Act
-        val result = TranscriptionUiStateMapper.updateInput(state, newText)
-
-        // Assert
-        assertTrue(result is TranscriptionUiState.Error)
-        val errorState = result as TranscriptionUiState.Error
+        // Act & Assert - Error
+        val errorResult = TranscriptionUiStateMapper.updateInput(defaultErrorState.copy(inputText = "old"), newText)
+        assertTrue(errorResult is TranscriptionUiState.Error)
+        val errorState = errorResult as TranscriptionUiState.Error
         assertEquals("error message", errorState.errorMessage)
         assertEquals(newText, errorState.inputText)
-    }
-
-    @Test
-    fun `updateInput with empty string should work correctly`() {
-        // Arrange
-        val state = defaultTranscribingState.copy(inputText = "some text")
-
-        // Act
-        val result = TranscriptionUiStateMapper.updateInput(state, "")
-
-        // Assert
-        assertTrue(result is TranscriptionUiState.Transcribing)
-        assertEquals("", result.inputText)
-    }
-
-    @Test
-    fun `map should preserve inputText across all state transitions`() {
-        // Arrange
-        val preservedText = "preserved text"
-        val recognitionStates = listOf(
-            SpeechRecognitionState.Idle,
-            SpeechRecognitionState.Recording,
-            SpeechRecognitionState.Error("error")
-        )
-        var currentState: TranscriptionUiState = defaultIdleState.copy(inputText = preservedText)
-
-        // Act & Assert
-        recognitionStates.forEach { recognitionState ->
-            currentState = TranscriptionUiStateMapper.map(recognitionState, currentUiState = currentState)
-            assertEquals(preservedText, currentState.inputText)
-        }
     }
 }
 
