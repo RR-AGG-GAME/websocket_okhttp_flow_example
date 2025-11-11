@@ -6,45 +6,28 @@ import app.cash.turbine.skipItems
 import com.example.websocketflow.audiotranscription.manager.SpeechRecognitionManager
 import com.example.websocketflow.audiotranscription.model.TranscriptionUiState
 import com.example.websocketflow.audiotranscription.model.SpeechRecognitionState
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@ExtendWith(CoroutinesTestExtension::class, InstantExecutorExtension::class)
 class AudioTranscriptionViewModelTest {
 
-    private val testDispatcher = StandardTestDispatcher()
-    private lateinit var viewModel: AudioTranscriptionViewModel
-    private lateinit var mockManager: MockSpeechRecognitionManager
-
-    private val defaultIdleState = SpeechRecognitionState.Idle
-    private val defaultRecordingState = SpeechRecognitionState.Recording
-    private val defaultTranscribingState = SpeechRecognitionState.Transcribing("partial transcription")
-    private val defaultReadyState = SpeechRecognitionState.Ready("final transcription")
-    private val defaultErrorState = SpeechRecognitionState.Error("Test error message")
-
-    @BeforeEach
-    fun setup() {
-        Dispatchers.setMain(testDispatcher)
-        mockManager = MockSpeechRecognitionManager()
-        viewModel = AudioTranscriptionViewModel(mockManager)
+    private val mockStateFlow = MutableStateFlow<SpeechRecognitionState>(SpeechRecognitionState.Idle)
+    private val mockManager: SpeechRecognitionManager = mock {
+        whenever(it.state).thenReturn(mockStateFlow.asStateFlow())
     }
-
-    @AfterEach
-    fun tearDown() {
-        Dispatchers.resetMain()
-    }
+    private val viewModel by lazy { AudioTranscriptionViewModel(mockManager) }
 
     @Test
     fun `initial state should be Idle`() = runTest {
@@ -78,6 +61,7 @@ class AudioTranscriptionViewModelTest {
     @Test
     fun `startRecording should clear inputText and call manager`() = runTest {
         // Arrange
+        mockStateFlow.value = SpeechRecognitionState.Idle
         viewModel.updateInputText("Existing text")
         advanceUntilIdle()
 
@@ -86,7 +70,7 @@ class AudioTranscriptionViewModelTest {
         advanceUntilIdle()
 
         // Assert
-        assertTrue(mockManager.startRecordingCalled)
+        verify(mockManager).startRecording()
         viewModel.uiState.test {
             val state = awaitItem()
             assertEquals("", state.inputText)
@@ -96,7 +80,7 @@ class AudioTranscriptionViewModelTest {
     @Test
     fun `Error state should show error message`() = runTest {
         // Arrange
-        mockManager.setState(defaultErrorState.copy(message = "Test error message"))
+        mockStateFlow.value = SpeechRecognitionState.Error("Test error message")
         advanceUntilIdle()
 
         // Assert
@@ -104,8 +88,8 @@ class AudioTranscriptionViewModelTest {
             skipItems(1)
             val state = awaitItem()
             assertTrue(state is TranscriptionUiState.Error)
-            val errorState = state as TranscriptionUiState.Error
-            assertEquals("Test error message", errorState.errorMessage)
+            val uiErrorState = state as TranscriptionUiState.Error
+            assertEquals("Test error message", uiErrorState.errorMessage)
         }
     }
 
@@ -145,44 +129,15 @@ class AudioTranscriptionViewModelTest {
 
     @Test
     fun `stopRecording should call manager stopRecording`() = runTest {
+        // Arrange
+        mockStateFlow.value = SpeechRecognitionState.Idle
+
         // Act
         viewModel.stopRecording()
         advanceUntilIdle()
 
         // Assert
-        assertTrue(mockManager.stopRecordingCalled)
-    }
-
-    // Mock implementation for testing
-    private class MockSpeechRecognitionManager : SpeechRecognitionManager {
-        private val _state = MutableStateFlow<SpeechRecognitionState>(SpeechRecognitionState.Idle)
-        override val state: StateFlow<SpeechRecognitionState> = _state
-
-        var stopRecordingCalled = false
-        var startRecordingCalled = false
-        var clearTranscriptionCalled = false
-        var destroyCalled = false
-
-        fun setState(newState: SpeechRecognitionState) {
-            _state.value = newState
-        }
-
-        override fun startRecording() {
-            startRecordingCalled = true
-        }
-
-        override fun stopRecording() {
-            stopRecordingCalled = true
-        }
-
-        override fun clearTranscription() {
-            clearTranscriptionCalled = true
-            _state.value = SpeechRecognitionState.Idle
-        }
-
-        override fun destroy() {
-            destroyCalled = true
-        }
+        verify(mockManager).stopRecording()
     }
 }
 
