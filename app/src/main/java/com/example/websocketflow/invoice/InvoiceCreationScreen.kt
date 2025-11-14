@@ -5,7 +5,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -147,6 +149,165 @@ fun ChatInputField(
 }
 
 
+@Composable
+fun InvoiceCreationCard(
+    isRecording: Boolean,
+    recordingTime: String = "0:00 / 2:00"
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF424242)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp)
+        ) {
+            Text(
+                text = "Ready to create an invoice?",
+                style = MaterialTheme.typography.headlineMedium,
+                color = Color.White,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            
+            Text(
+                text = "Just say or type:",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.9f),
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            
+            // Customer name
+            Row(
+                modifier = Modifier.padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Customer name",
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Customer name",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White.copy(alpha = 0.9f)
+                )
+            }
+            
+            // Item description
+            Row(
+                modifier = Modifier.padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Description,
+                    contentDescription = "Item description",
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Item description",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White.copy(alpha = 0.9f)
+                )
+            }
+            
+            // Price
+            Row(
+                modifier = Modifier.padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "£",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Price",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White.copy(alpha = 0.9f)
+                )
+            }
+            
+            // Due in
+            Row(
+                modifier = Modifier.padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CalendarToday,
+                    contentDescription = "Due in",
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Due in",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White.copy(alpha = 0.9f)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Text(
+                text = "Text and voice prompts are processed by third parties.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.6f),
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            
+            // Voice input indicator
+            if (isRecording) {
+                Row(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Listening",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Listening...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.9f)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    // Progress dots
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        repeat(6) {
+                            Box(
+                                modifier = Modifier
+                                    .size(4.dp)
+                                    .background(Color.White, CircleShape)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = recordingTime,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InvoiceCreationScreen(
@@ -156,6 +317,7 @@ fun InvoiceCreationScreen(
     val uiState by viewModel.uiState.collectAsState()
     
     val messages = remember { mutableStateListOf<String>() }
+    val listState = rememberLazyListState()
     
     val currentState = uiState
     val inputText = currentState.inputText
@@ -165,6 +327,26 @@ fun InvoiceCreationScreen(
     val errorMessage = when (currentState) {
         is TranscriptionUiState.Error -> currentState.errorMessage
         else -> ""
+    }
+    
+    // Scroll to bottom initially to show card when empty
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100)
+        // Spacer at 0, card at 1 - always consistent
+        listState.animateScrollToItem(1)
+    }
+    
+    // Auto-scroll to show newest message when messages are added
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            kotlinx.coroutines.delay(100)
+            // Spacer at 0, card at 1, messages start at 2
+            // Newest message is at index: 1 (card) + messages.size = messages.size + 1
+            val newestMessageIndex = messages.size + 1
+            if (newestMessageIndex < listState.layoutInfo.totalItemsCount) {
+                listState.animateScrollToItem(newestMessageIndex)
+            }
+        }
     }
     
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -194,9 +376,28 @@ fun InvoiceCreationScreen(
             .padding(16.dp)
     ) {
         LazyColumn(
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            state = listState
         ) {
-            items(messages) { message ->
+            // Spacer - always present, always full height to push card to bottom
+            item(key = "spacer") {
+                Spacer(
+                    modifier = Modifier
+                        .fillParentMaxHeight()
+                        .fillMaxWidth()
+                )
+            }
+            
+            // Card at index 1 - always at this position
+            item(key = "card") {
+                InvoiceCreationCard(
+                    isRecording = isRecording,
+                    recordingTime = "0:00 / 2:00"
+                )
+            }
+            
+            // Messages appear just below the card (index 2, 3, 4...)
+            items(messages, key = { it }) { message ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -225,9 +426,9 @@ fun InvoiceCreationScreen(
                     viewModel.sendMessage()
                 }
             },
-                    onVoiceStart = {
-                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    },
+            onVoiceStart = {
+                permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            },
             onVoiceStop = {
                 viewModel.stopRecording()
             }
