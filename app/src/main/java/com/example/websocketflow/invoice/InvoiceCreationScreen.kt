@@ -32,6 +32,12 @@ import android.widget.Toast
 import org.koin.androidx.compose.koinViewModel
 import com.example.websocketflow.audiotranscription.model.TranscriptionUiState
 import com.example.websocketflow.audiotranscription.viewmodel.AudioTranscriptionViewModel
+import androidx.compose.ui.text.font.FontWeight
+
+data class ChatMessage(
+    val text: String,
+    val isSent: Boolean // true for sent (right), false for received (left)
+)
 
 @Composable
 fun ChatInputField(
@@ -154,10 +160,15 @@ fun InvoiceCreationCard(
     isRecording: Boolean,
     recordingTime: String = "0:00 / 2:00"
 ) {
-    Card(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.8f),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color(0xFF424242)
@@ -306,6 +317,7 @@ fun InvoiceCreationCard(
             }
         }
     }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -316,7 +328,7 @@ fun InvoiceCreationScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     
-    val messages = remember { mutableStateListOf<String>() }
+    val messages = remember { mutableStateListOf<ChatMessage>() }
     val listState = rememberLazyListState()
     
     val currentState = uiState
@@ -397,16 +409,30 @@ fun InvoiceCreationScreen(
             }
             
             // Messages appear just below the card (index 2, 3, 4...)
-            items(messages, key = { it }) { message ->
-                Card(
+            items(messages, key = { it.text + it.isSent }) { message ->
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp)
+                        .padding(vertical = 4.dp, horizontal = 8.dp),
+                    horizontalArrangement = if (message.isSent) Arrangement.End else Arrangement.Start
                 ) {
-                    Text(
-                        text = message,
-                        modifier = Modifier.padding(16.dp)
-                    )
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth(0.8f),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (message.isSent) {
+                                Color(0xFF4CAF50) // Green for sent messages
+                            } else {
+                                Color(0xFFE0E0E0) // Light grey for received messages
+                            }
+                        )
+                    ) {
+                        Text(
+                            text = message.text,
+                            modifier = Modifier.padding(16.dp),
+                            color = if (message.isSent) Color.White else Color.Black
+                        )
+                    }
                 }
             }
         }
@@ -422,7 +448,7 @@ fun InvoiceCreationScreen(
             isTyping = isTyping,
             onSend = {
                 if (inputText.isNotEmpty()) {
-                    messages.add(inputText)
+                    messages.add(ChatMessage(text = inputText, isSent = true))
                     viewModel.sendMessage()
                 }
             },
