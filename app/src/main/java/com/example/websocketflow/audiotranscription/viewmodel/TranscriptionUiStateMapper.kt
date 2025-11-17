@@ -8,8 +8,11 @@ object TranscriptionUiStateMapper {
         recognitionState: SpeechRecognitionState,
         currentUiState: TranscriptionUiState
     ): TranscriptionUiState = when (recognitionState) {
-        is SpeechRecognitionState.Idle, is SpeechRecognitionState.Ready -> 
+        is SpeechRecognitionState.Idle -> 
             TranscriptionUiState.Idle(currentUiState.inputText)
+        is SpeechRecognitionState.Ready -> 
+            // Ready state should use the transcription result, not current inputText
+            TranscriptionUiState.Idle(recognitionState.transcriptionResult)
         is SpeechRecognitionState.Recording -> 
             TranscriptionUiState.Recording(currentUiState.inputText)
         is SpeechRecognitionState.Transcribing -> 

@@ -16,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -62,6 +64,9 @@ private object InvoiceDimens {
     val ProgressDotSize = 4.dp
     val ProgressDotSpacing = 4.dp
     val ProgressDotCount = 6
+    val RecordingMaxDurationSeconds = 120 // 2 minutes
+    val PlaceholderImageSize = 120.dp
+    val WaveAnimationHeight = 60.dp
 }
 
 // Data Models
@@ -218,11 +223,99 @@ fun ActionButton(
 }
 
 @Composable
+fun PlaceholderImage(
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(InvoiceDimens.PlaceholderImageSize)
+            .background(
+                color = InvoiceColors.BorderGray.copy(alpha = 0.3f),
+                shape = CircleShape
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Mic,
+            contentDescription = "Placeholder",
+            tint = InvoiceColors.TextGray,
+            modifier = Modifier.size(InvoiceDimens.IconSize * 2)
+        )
+    }
+}
+
+@Composable
+fun AudioWaveAnimation(
+    modifier: Modifier = Modifier
+) {
+    var animationFrame by remember { mutableStateOf(0) }
+    
+    LaunchedEffect(Unit) {
+        while (true) {
+            animationFrame++
+            kotlinx.coroutines.delay(150)
+        }
+    }
+    
+    Row(
+        modifier = modifier
+            .height(InvoiceDimens.WaveAnimationHeight)
+            .fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(5) { index ->
+            // Each bar animates with a slight offset to create wave effect
+            val baseHeight = 8.dp
+            val maxHeight = 40.dp
+            // Create wave effect with different phases for each bar
+            val phase = (animationFrame + index * 2) % 10
+            val heightRatio = (phase / 10f).coerceIn(0f, 1f)
+            val animatedHeight = baseHeight + (maxHeight - baseHeight) * heightRatio
+            
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(animatedHeight)
+                    .background(
+                        color = InvoiceColors.PrimaryGreen,
+                        shape = RoundedCornerShape(2.dp)
+                    )
+            )
+            if (index < 4) {
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun RecordingTimer(
+    elapsedSeconds: Int,
+    maxSeconds: Int = InvoiceDimens.RecordingMaxDurationSeconds,
+    modifier: Modifier = Modifier
+) {
+    val minutes = elapsedSeconds / 60
+    val seconds = elapsedSeconds % 60
+    val maxMinutes = maxSeconds / 60
+    val maxSecs = maxSeconds % 60
+    
+    Text(
+        text = String.format("%d:%02d/%d:%02d", minutes, seconds, maxMinutes, maxSecs),
+        style = MaterialTheme.typography.bodySmall,
+        color = InvoiceColors.TextGray,
+        modifier = modifier
+    )
+}
+
+@Composable
 fun ChatInputField(
     inputText: String,
     onTextChange: (String) -> Unit,
     isRecording: Boolean,
+    isTranscribing: Boolean,
     isTyping: Boolean,
+    isSpeaking: Boolean = false, // TODO: Get from ViewModel when available
     onSend: () -> Unit,
     onVoiceStart: () -> Unit,
     onVoiceStop: () -> Unit,
@@ -232,72 +325,186 @@ fun ChatInputField(
         mutableStateOf(TextFieldValue(inputText, selection = TextRange(inputText.length)))
     }
 
+    // Timer state for recording
+    var elapsedSeconds by remember { mutableStateOf(0) }
+    
+    // Timer that runs when recording starts and only auto-stops at 2 minutes
+    LaunchedEffect(isRecording) {
+        if (isRecording) {
+            // Reset timer when recording starts
+            elapsedSeconds = 0
+            var currentSeconds = 0
+            
+            // Run timer until 2 minutes
+            while (currentSeconds < InvoiceDimens.RecordingMaxDurationSeconds) {
+                kotlinx.coroutines.delay(1000)
+                currentSeconds++
+                elapsedSeconds = currentSeconds
+            }
+            
+            // Auto-stop when 2 minutes reached (only if still recording)
+            // Note: isRecording might have changed, but we still want to stop at 2 min
+            onVoiceStop()
+        } else {
+            // Reset timer when recording stops
+            elapsedSeconds = 0
+        }
+    }
+
     LaunchedEffect(inputText) {
         if (textFieldValue.text != inputText) {
             textFieldValue = TextFieldValue(inputText, selection = TextRange(inputText.length))
         }
     }
 
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        OutlinedTextField(
-            value = textFieldValue,
-            onValueChange = { newValue ->
-                if (!isRecording) {
+    // Show recording UI when recording
+    if (isRecording) {
+        Column(
+            modifier = modifier.fillMaxWidth()
+        ) {
+            // "Listening..." and timer row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Listening...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = InvoiceColors.TextGray
+                )
+                RecordingTimer(elapsedSeconds = elapsedSeconds)
+            }
+            
+            Spacer(modifier = Modifier.height(InvoiceDimens.SpacingMedium))
+            
+            // Placeholder or audio wave based on speaking state
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (isSpeaking) {
+                    AudioWaveAnimation()
+                } else {
+                    PlaceholderImage()
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(InvoiceDimens.SpacingMedium))
+            
+            // Stop button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                ActionButton(
+                    isRecording = true,
+                    isTyping = false,
+                    onClick = onVoiceStop
+                )
+            }
+        }
+    } else if (isTranscribing) {
+        // Transcribing state
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Simple loading indicator using dots animation
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                repeat(3) { index ->
+                    var scale by remember { mutableStateOf(0.5f) }
+                    LaunchedEffect(index) {
+                        // Stagger the animation for each dot
+                        kotlinx.coroutines.delay(index * 200L)
+                        while (true) {
+                            scale = 1f
+                            kotlinx.coroutines.delay(300)
+                            scale = 0.5f
+                            kotlinx.coroutines.delay(300)
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(
+                                color = InvoiceColors.PrimaryGreen.copy(alpha = scale),
+                                shape = CircleShape
+                            )
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(InvoiceDimens.SpacingMedium))
+            Text(
+                text = "Transcribing...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = InvoiceColors.TextGray
+            )
+        }
+    } else {
+        // Normal text input field
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = textFieldValue,
+                onValueChange = { newValue ->
                     textFieldValue = newValue
                     onTextChange(newValue.text)
-                }
-            },
-            enabled = !isRecording,
-            label = { Text("Enter customer, items, amount") },
-            placeholder = { Text("Enter customer, items, amount") },
-            trailingIcon = {
-                if (inputText.isNotEmpty() && !isRecording) {
-                    IconButton(onClick = {
-                        textFieldValue = TextFieldValue("")
-                        onTextChange("")
-                    }) {
-                        Icon(Icons.Default.Close, "Clear", tint = Color.Gray)
+                },
+                label = { Text("Enter customer, items, amount") },
+                placeholder = { Text("Enter customer, items, amount") },
+                trailingIcon = {
+                    if (inputText.isNotEmpty()) {
+                        IconButton(onClick = {
+                            textFieldValue = TextFieldValue("")
+                            onTextChange("")
+                        }) {
+                            Icon(Icons.Default.Close, "Clear", tint = Color.Gray)
+                        }
                     }
-                }
-            },
-            modifier = Modifier
-                .weight(1f)
-                .heightIn(min = InvoiceDimens.ActionButtonSize, max = 200.dp),
-            shape = RoundedCornerShape(InvoiceDimens.InputFieldCornerRadius),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = InvoiceColors.PrimaryGreen,
-                unfocusedBorderColor = InvoiceColors.BorderGray,
-                focusedContainerColor = InvoiceColors.White,
-                unfocusedContainerColor = InvoiceColors.White,
-                focusedLabelColor = InvoiceColors.PrimaryGreen,
-                unfocusedLabelColor = InvoiceColors.TextGray
-            ),
-            maxLines = 5,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            keyboardActions = KeyboardActions(onNext = {
-                val newText = textFieldValue.text + "\n"
-                textFieldValue = TextFieldValue(newText, selection = TextRange(newText.length))
-                onTextChange(newText)
-            })
-        )
-
-        Spacer(modifier = Modifier.width(InvoiceDimens.SpacingSmall))
-
-        if (inputText.isEmpty() || isRecording || isTyping) {
-            ActionButton(
-                isRecording = isRecording,
-                isTyping = isTyping,
-                onClick = {
-                    when {
-                        isRecording -> onVoiceStop()
-                        isTyping -> onSend()
-                        else -> onVoiceStart()
-                    }
-                }
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = InvoiceDimens.ActionButtonSize, max = 200.dp),
+                shape = RoundedCornerShape(InvoiceDimens.InputFieldCornerRadius),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = InvoiceColors.PrimaryGreen,
+                    unfocusedBorderColor = InvoiceColors.BorderGray,
+                    focusedContainerColor = InvoiceColors.White,
+                    unfocusedContainerColor = InvoiceColors.White,
+                    focusedLabelColor = InvoiceColors.PrimaryGreen,
+                    unfocusedLabelColor = InvoiceColors.TextGray
+                ),
+                maxLines = 5,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = {
+                    val newText = textFieldValue.text + "\n"
+                    textFieldValue = TextFieldValue(newText, selection = TextRange(newText.length))
+                    onTextChange(newText)
+                })
             )
+
+            Spacer(modifier = Modifier.width(InvoiceDimens.SpacingSmall))
+
+            if (inputText.isEmpty() || isTyping) {
+                ActionButton(
+                    isRecording = false,
+                    isTyping = isTyping,
+                    onClick = {
+                        when {
+                            isTyping -> onSend()
+                            else -> onVoiceStart()
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -388,9 +595,9 @@ fun InvoiceCreationScreen(
 
     val currentState = uiState
     val inputText = currentState.inputText
-    val isRecording = currentState is TranscriptionUiState.Recording ||
-            currentState is TranscriptionUiState.Transcribing
-    val isTyping = currentState.inputText.isNotEmpty()
+    val isRecording = currentState is TranscriptionUiState.Recording
+    val isTranscribing = currentState is TranscriptionUiState.Transcribing
+    val isTyping = currentState.inputText.isNotEmpty() && !isRecording && !isTranscribing
     val errorMessage = when (currentState) {
         is TranscriptionUiState.Error -> currentState.errorMessage
         else -> ""
@@ -468,7 +675,9 @@ fun InvoiceCreationScreen(
             inputText = inputText,
             onTextChange = { viewModel.updateInputText(it) },
             isRecording = isRecording,
+            isTranscribing = isTranscribing,
             isTyping = isTyping,
+            isSpeaking = false, // TODO: Get from ViewModel when audio level detection is available
             onSend = {
                 if (inputText.isNotEmpty()) {
                     messages.add(ChatMessage(text = inputText, isSent = true))
@@ -541,7 +750,57 @@ private fun ChatInputFieldPreview() {
         inputText = "Sample input text",
         onTextChange = {},
         isRecording = false,
+        isTranscribing = false,
         isTyping = true,
+        isSpeaking = false,
+        onSend = {},
+        onVoiceStart = {},
+        onVoiceStop = {}
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ChatInputFieldRecordingPreview() {
+    ChatInputField(
+        inputText = "",
+        onTextChange = {},
+        isRecording = true,
+        isTranscribing = false,
+        isTyping = false,
+        isSpeaking = false,
+        onSend = {},
+        onVoiceStart = {},
+        onVoiceStop = {}
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ChatInputFieldRecordingWithWavePreview() {
+    ChatInputField(
+        inputText = "",
+        onTextChange = {},
+        isRecording = true,
+        isTranscribing = false,
+        isTyping = false,
+        isSpeaking = true,
+        onSend = {},
+        onVoiceStart = {},
+        onVoiceStop = {}
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ChatInputFieldTranscribingPreview() {
+    ChatInputField(
+        inputText = "",
+        onTextChange = {},
+        isRecording = false,
+        isTranscribing = true,
+        isTyping = false,
+        isSpeaking = false,
         onSend = {},
         onVoiceStart = {},
         onVoiceStop = {}

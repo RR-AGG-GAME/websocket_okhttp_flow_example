@@ -8,8 +8,6 @@ import com.example.websocketflow.audiotranscription.model.SpeechRecognitionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 
@@ -19,32 +17,27 @@ class AudioTranscriptionViewModel(
 
     private val _inputText = MutableStateFlow("")
     
-    init {
-        speechRecognitionManager.state
-            .onEach(::handleRecognitionState)
-            .launchIn(viewModelScope)
-    }
-    
-    private fun handleRecognitionState(recognitionState: SpeechRecognitionState) {
-        when (recognitionState) {
-            is SpeechRecognitionState.Transcribing -> 
-                _inputText.value = recognitionState.transcriptionResult
-            is SpeechRecognitionState.Ready -> 
-                _inputText.value = recognitionState.transcriptionResult
-            else -> { }
-        }
-    }
-    
-    val uiState: StateFlow<TranscriptionUiState> = combine(
-        speechRecognitionManager.state.scan(
+    val uiState: StateFlow<TranscriptionUiState> = speechRecognitionManager.state
+        .scan(
             initial = TranscriptionUiState.Idle() as TranscriptionUiState
         ) { current: TranscriptionUiState, recognitionState: SpeechRecognitionState ->
+            // Update _inputText when we get transcription results
+            when (recognitionState) {
+                is SpeechRecognitionState.Transcribing -> {
+                    _inputText.value = recognitionState.transcriptionResult
+                }
+                is SpeechRecognitionState.Ready -> {
+                    _inputText.value = recognitionState.transcriptionResult
+                }
+                else -> { }
+            }
+            // Map the recognition state to UI state
             TranscriptionUiStateMapper.map(recognitionState, current)
-        },
-        _inputText
-    ) { mappedState: TranscriptionUiState, inputText: String ->
-        TranscriptionUiStateMapper.updateInput(mappedState, inputText)
-    }
+        }
+        .combine(_inputText) { mappedState: TranscriptionUiState, inputText: String ->
+            // Update the mapped state with the current input text
+            TranscriptionUiStateMapper.updateInput(mappedState, inputText)
+        }
         .stateIn(
             scope = viewModelScope,
             started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
