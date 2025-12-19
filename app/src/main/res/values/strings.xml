@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mic_button_single_tap_announcement">Hey, how can i help you.</string>
+    <string name="mic_button_double_tap_announcement">I am ready to help now</string>
+</resources>
+
