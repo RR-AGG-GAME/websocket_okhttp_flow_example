@@ -2,5 +2,7 @@
 <resources>
     <string name="mic_button_single_tap_announcement">Hey, how can i help you.</string>
     <string name="mic_button_double_tap_announcement">I am ready to help now</string>
+    <string name="stop_button_single_tap_announcement">recording in progress . Double tap to finish recording</string>
+    <string name="stop_button_double_tap_announcement">recording stopped. transcribing now</string>
 </resources>
 

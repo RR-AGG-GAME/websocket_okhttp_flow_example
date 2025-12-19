@@ -42,6 +42,7 @@ fun ActionButton(
     var singleTapJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     
     val isMicButton = !isRecording && !isTyping
+    val isStopButton = isRecording
     
     DisposableEffect(Unit) {
         onDispose {
@@ -56,22 +57,38 @@ fun ActionButton(
             
             val previousTapTime = firstTapTime
             if (previousTapTime != null && (currentTime - previousTapTime) < 2000) {
-                // Double tap detected
                 firstTapTime = null
                 try {
                     view.announceForAccessibility(context.getString(R.string.mic_button_double_tap_announcement))
                 } catch (e: Exception) {
-                    // Ignore
                 }
                 onClick()
             } else {
-                // First tap - wait for potential double tap
                 firstTapTime = currentTime
                 singleTapJob = coroutineScope.launch {
                     delay(2000)
                     if (firstTapTime != null && firstTapTime == currentTime) {
-                        // Single tap confirmed - only announce if not using TalkBack
-                        // TalkBack will read contentDescription on focus, so we don't need to announce here
+                        firstTapTime = null
+                    }
+                }
+            }
+        } else if (isStopButton) {
+            val currentTime = System.currentTimeMillis()
+            singleTapJob?.cancel()
+            
+            val previousTapTime = firstTapTime
+            if (previousTapTime != null && (currentTime - previousTapTime) < 2000) {
+                firstTapTime = null
+                try {
+                    view.announceForAccessibility(context.getString(R.string.stop_button_double_tap_announcement))
+                } catch (e: Exception) {
+                }
+                onClick()
+            } else {
+                firstTapTime = currentTime
+                singleTapJob = coroutineScope.launch {
+                    delay(2000)
+                    if (firstTapTime != null && firstTapTime == currentTime) {
                         firstTapTime = null
                     }
                 }
@@ -94,35 +111,64 @@ fun ActionButton(
             )
             .border(1.dp, InvoiceColors.BorderGray, CircleShape)
             .then(
-                if (isMicButton) {
-                    Modifier
-                        .semantics {
-                            role = Role.Button
-                            // Single tap (focus) - TalkBack reads this
-                            contentDescription = context.getString(R.string.mic_button_single_tap_announcement)
-                            // Double tap (activate) - TalkBack calls this
-                            onClick(label = "") {
-                                // This is called on TalkBack double-tap
-                                try {
-                                    view.announceForAccessibility(context.getString(R.string.mic_button_double_tap_announcement))
-                                } catch (e: Exception) {
-                                    // Ignore
+                when {
+                    isMicButton -> {
+                        Modifier
+                            .semantics {
+                                role = Role.Button
+                                contentDescription = context.getString(R.string.mic_button_single_tap_announcement)
+                                onClick(label = "") {
+                                    coroutineScope.launch {
+                                        try {
+                                            view.post {
+                                                view.announceForAccessibility(context.getString(R.string.mic_button_double_tap_announcement))
+                                            }
+                                            delay(2000)
+                                            onClick()
+                                        } catch (e: Exception) {
+                                        }
+                                    }
+                                    true
                                 }
-                                onClick()
-                                true
                             }
-                        }
-                        .clickable(
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = rememberRipple(bounded = true),
+                                onClick = handleClick
+                            )
+                    }
+                    isStopButton -> {
+                        Modifier
+                            .semantics {
+                                role = Role.Button
+                                contentDescription = context.getString(R.string.stop_button_single_tap_announcement)
+                                onClick(label = "") {
+                                    coroutineScope.launch {
+                                        try {
+                                            view.post {
+                                                view.announceForAccessibility(context.getString(R.string.stop_button_double_tap_announcement))
+                                            }
+                                            delay(2000)
+                                            onClick()
+                                        } catch (e: Exception) {
+                                        }
+                                    }
+                                    true
+                                }
+                            }
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = rememberRipple(bounded = true),
+                                onClick = handleClick
+                            )
+                    }
+                    else -> {
+                        Modifier.clickable(
                             interactionSource = interactionSource,
                             indication = rememberRipple(bounded = true),
-                            onClick = handleClick
+                            onClick = onClick
                         )
-                } else {
-                    Modifier.clickable(
-                        interactionSource = interactionSource,
-                        indication = rememberRipple(bounded = true),
-                        onClick = onClick
-                    )
+                    }
                 }
             ),
         contentAlignment = Alignment.Center
@@ -133,7 +179,7 @@ fun ActionButton(
                 isTyping -> Icons.Default.Send
                 else -> Icons.Default.Mic
             },
-            contentDescription = null, // Let parent semantics handle it
+            contentDescription = null,
             tint = when {
                 isRecording || isTyping -> InvoiceColors.White
                 else -> Color.Gray
