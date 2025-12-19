@@ -45,57 +45,22 @@ fun ActionButton(
     val isStopButton = isRecording
     
     DisposableEffect(Unit) {
-        onDispose {
-            singleTapJob?.cancel()
-        }
+        onDispose { singleTapJob?.cancel() }
     }
     
-    val handleClick: () -> Unit = {
-        if (isMicButton) {
-            val currentTime = System.currentTimeMillis()
-            singleTapJob?.cancel()
-            
-            val previousTapTime = firstTapTime
-            if (previousTapTime != null && (currentTime - previousTapTime) < 2000) {
-                firstTapTime = null
-                try {
-                    view.announceForAccessibility(context.getString(R.string.mic_button_double_tap_announcement))
-                } catch (e: Exception) {
-                }
-                onClick()
-            } else {
-                firstTapTime = currentTime
-                singleTapJob = coroutineScope.launch {
-                    delay(2000)
-                    if (firstTapTime != null && firstTapTime == currentTime) {
-                        firstTapTime = null
-                    }
-                }
-            }
-        } else if (isStopButton) {
-            val currentTime = System.currentTimeMillis()
-            singleTapJob?.cancel()
-            
-            val previousTapTime = firstTapTime
-            if (previousTapTime != null && (currentTime - previousTapTime) < 2000) {
-                firstTapTime = null
-                try {
-                    view.announceForAccessibility(context.getString(R.string.stop_button_double_tap_announcement))
-                } catch (e: Exception) {
-                }
-                onClick()
-            } else {
-                firstTapTime = currentTime
-                singleTapJob = coroutineScope.launch {
-                    delay(2000)
-                    if (firstTapTime != null && firstTapTime == currentTime) {
-                        firstTapTime = null
-                    }
-                }
-            }
-        } else {
-            onClick()
-        }
+    val handleClick = remember(isMicButton, isStopButton) {
+        createDoubleTapHandler(
+            isMicButton = isMicButton,
+            isStopButton = isStopButton,
+            context = context,
+            view = view,
+            coroutineScope = coroutineScope,
+            getFirstTapTime = { firstTapTime },
+            setFirstTapTime = { firstTapTime = it },
+            getSingleTapJob = { singleTapJob },
+            setSingleTapJob = { singleTapJob = it },
+            onAction = onClick
+        )
     }
     
     Box(
@@ -112,63 +77,29 @@ fun ActionButton(
             .border(1.dp, InvoiceColors.BorderGray, CircleShape)
             .then(
                 when {
-                    isMicButton -> {
-                        Modifier
-                            .semantics {
-                                role = Role.Button
-                                contentDescription = context.getString(R.string.mic_button_single_tap_announcement)
-                                onClick(label = "") {
-                                    coroutineScope.launch {
-                                        try {
-                                            view.post {
-                                                view.announceForAccessibility(context.getString(R.string.mic_button_double_tap_announcement))
-                                            }
-                                            delay(2000)
-                                            onClick()
-                                        } catch (e: Exception) {
-                                        }
-                                    }
-                                    true
-                                }
-                            }
-                            .clickable(
-                                interactionSource = interactionSource,
-                                indication = rememberRipple(bounded = true),
-                                onClick = handleClick
-                            )
-                    }
-                    isStopButton -> {
-                        Modifier
-                            .semantics {
-                                role = Role.Button
-                                contentDescription = context.getString(R.string.stop_button_single_tap_announcement)
-                                onClick(label = "") {
-                                    coroutineScope.launch {
-                                        try {
-                                            view.post {
-                                                view.announceForAccessibility(context.getString(R.string.stop_button_double_tap_announcement))
-                                            }
-                                            delay(2000)
-                                            onClick()
-                                        } catch (e: Exception) {
-                                        }
-                                    }
-                                    true
-                                }
-                            }
-                            .clickable(
-                                interactionSource = interactionSource,
-                                indication = rememberRipple(bounded = true),
-                                onClick = handleClick
-                            )
-                    }
-                    else -> {
-                        Modifier.clickable(
-                            interactionSource = interactionSource,
-                            indication = rememberRipple(bounded = true),
-                            onClick = onClick
-                        )
-                    }
+                    isMicButton -> createAccessibleModifier(
+                        singleTapMessage = context.getString(R.string.mic_button_single_tap_announcement),
+                        doubleTapMessage = context.getString(R.string.mic_button_double_tap_announcement),
+                        onClick = onClick,
+                        coroutineScope = coroutineScope,
+                        view = view,
+                        interactionSource = interactionSource,
+                        handleClick = handleClick
+                    )
+                    isStopButton -> createAccessibleModifier(
+                        singleTapMessage = context.getString(R.string.stop_button_single_tap_announcement),
+                        doubleTapMessage = context.getString(R.string.stop_button_double_tap_announcement),
+                        onClick = onClick,
+                        coroutineScope = coroutineScope,
+                        view = view,
+                        interactionSource = interactionSource,
+                        handleClick = handleClick
+                    )
+                    else -> Modifier.clickable(
+                        interactionSource = interactionSource,
+                        indication = rememberRipple(bounded = true),
+                        onClick = onClick
+                    )
                 }
             ),
         contentAlignment = Alignment.Center
@@ -187,4 +118,85 @@ fun ActionButton(
             modifier = Modifier.size(InvoiceDimens.IconSize)
         )
     }
+}
+
+private fun createDoubleTapHandler(
+    isMicButton: Boolean,
+    isStopButton: Boolean,
+    context: android.content.Context,
+    view: android.view.View,
+    coroutineScope: kotlinx.coroutines.CoroutineScope,
+    getFirstTapTime: () -> Long?,
+    setFirstTapTime: (Long?) -> Unit,
+    getSingleTapJob: () -> kotlinx.coroutines.Job?,
+    setSingleTapJob: (kotlinx.coroutines.Job?) -> Unit,
+    onAction: () -> Unit
+): () -> Unit {
+    return {
+        if (isMicButton || isStopButton) {
+            val currentTime = System.currentTimeMillis()
+            getSingleTapJob()?.cancel()
+            
+            val previousTapTime = getFirstTapTime()
+            if (previousTapTime != null && (currentTime - previousTapTime) < 2000) {
+                val announcement = if (isMicButton) {
+                    context.getString(R.string.mic_button_double_tap_announcement)
+                } else {
+                    context.getString(R.string.stop_button_double_tap_announcement)
+                }
+                try {
+                    view.announceForAccessibility(announcement)
+                } catch (e: Exception) {
+                }
+                setFirstTapTime(null)
+                onAction()
+            } else {
+                setFirstTapTime(currentTime)
+                val newJob = coroutineScope.launch {
+                    delay(2000)
+                    if (getFirstTapTime() == currentTime) {
+                        setFirstTapTime(null)
+                    }
+                }
+                setSingleTapJob(newJob)
+            }
+        } else {
+            onAction()
+        }
+    }
+}
+
+@Composable
+private fun createAccessibleModifier(
+    singleTapMessage: String,
+    doubleTapMessage: String,
+    onClick: () -> Unit,
+    coroutineScope: kotlinx.coroutines.CoroutineScope,
+    view: android.view.View,
+    interactionSource: androidx.compose.foundation.interaction.MutableInteractionSource,
+    handleClick: () -> Unit
+): Modifier {
+    return Modifier
+        .semantics {
+            role = Role.Button
+            contentDescription = singleTapMessage
+            onClick(label = "") {
+                coroutineScope.launch {
+                    try {
+                        view.post {
+                            view.announceForAccessibility(doubleTapMessage)
+                        }
+                        delay(2000)
+                        onClick()
+                    } catch (e: Exception) {
+                    }
+                }
+                true
+            }
+        }
+        .clickable(
+            interactionSource = interactionSource,
+            indication = rememberRipple(bounded = true),
+            onClick = handleClick
+        )
 }
